@@ -2,8 +2,8 @@
   "name": "律师工作助手",
   "short_name": "律师助手",
   "description": "律师工作记录工具 — 庭审日历、待办任务、案件管理",
-  "start_url": "/",
-  "scope": "/",
+  "start_url": "/lawyer-assistant/",
+  "scope": "/lawyer-assistant/",
   "display": "standalone",
   "orientation": "portrait-primary",
   "background_color": "#ffffff",
@@ -24,7 +24,7 @@
     }
   ],
   "share_target": {
-    "action": "/share-target",
+    "action": "share-target",
     "method": "POST",
     "enctype": "multipart/form-data",
     "params": {
@@ -41,7 +41,7 @@
   },
   "file_handlers": [
     {
-      "action": "/share-target",
+      "action": "share-target",
       "accept": {
         "application/pdf": [".pdf"],
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [".docx"]

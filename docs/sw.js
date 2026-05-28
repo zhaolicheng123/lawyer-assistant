@@ -1,6 +1,7 @@
 // 律师工作助手 — Service Worker
-const CACHE_NAME = 'lawyer-assistant-v1';
-const STATIC_FILES = ['/', '/index.html', '/manifest.json', '/icon.svg'];
+const BASE = '/lawyer-assistant';
+const CACHE_NAME = 'lawyer-assistant-v2';
+const STATIC_FILES = [BASE + '/', BASE + '/index.html', BASE + '/manifest.json', BASE + '/icon.svg'];
 
 // ===== Install =====
 self.addEventListener('install', (event) => {
@@ -28,8 +29,8 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
-  // Intercept share target POST
-  if (url.pathname.endsWith('/share-target') && event.request.method === 'POST') {
+  // Intercept share target POST (relative action resolves to /lawyer-assistant/share-target)
+  if (url.pathname === BASE + '/share-target' && event.request.method === 'POST') {
     event.respondWith(handleShareTarget(event.request));
     return;
   }
@@ -48,7 +49,7 @@ async function handleShareTarget(request) {
     const file = formData.get('file');
 
     if (!file || !(file instanceof Blob)) {
-      return Response.redirect('/?shared=0', 302);
+      return Response.redirect(BASE + '/?shared=0', 302);
     }
 
     // Store file in Cache API so the main page can retrieve it
@@ -63,9 +64,9 @@ async function handleShareTarget(request) {
     await cache.put('/pending-shared-file', response);
 
     // Redirect to main page
-    return Response.redirect('/?shared=1', 302);
+    return Response.redirect(BASE + '/?shared=1', 302);
   } catch (err) {
     console.error('SW: share target error', err);
-    return Response.redirect('/?shared=0', 302);
+    return Response.redirect(BASE + '/?shared=0', 302);
   }
 }
