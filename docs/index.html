@@ -779,6 +779,45 @@ body {
   line-height: 1.5;
 }
 .raw-text-preview.open { display: block; }
+
+/* ===== Attachments ===== */
+.attach-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.attach-link {
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 4px 10px; background: var(--primary-bg);
+  border-radius: 14px; font-size: 12px; font-weight: 500;
+  color: var(--primary); cursor: pointer; text-decoration: none;
+  transition: background 0.15s; border: none;
+}
+.attach-link:hover { background: #d0dff0; }
+.attach-label-tag {
+  font-size: 10px; background: var(--accent-bg); color: var(--accent);
+  padding: 1px 5px; border-radius: 8px; margin-right: 2px;
+}
+.attach-delete {
+  margin-left: 2px; cursor: pointer; color: var(--gray-500); font-weight: 700;
+  font-size: 13px; line-height: 1;
+}
+.attach-delete:hover { color: var(--danger); }
+.attach-add-row { display: flex; gap: 6px; align-items: center; margin-top: 8px; }
+.attach-add-row select {
+  padding: 5px 8px; border: 1px solid var(--gray-300); border-radius: var(--radius-sm);
+  font-size: 12px; font-family: var(--font);
+}
+.attach-add-row .btn { font-size: 12px; padding: 5px 10px; }
+
+/* ===== Calendar Sections ===== */
+.cal-section-title {
+  font-size: 14px; font-weight: 700; color: var(--gray-700);
+  margin: 14px 0 8px; padding-bottom: 4px;
+  border-bottom: 2px solid var(--gray-100);
+}
+.cal-section-title .count { font-weight: 400; color: var(--gray-500); font-size: 12px; }
+.case-link-inline {
+  font-size: 12px; color: var(--primary); cursor: pointer; margin-top: 6px;
+  display: inline-block; font-weight: 500;
+}
+.case-link-inline:hover { text-decoration: underline; }
 </style>
 </head>
 <body>
@@ -971,6 +1010,62 @@ function saveCases(cases) {
 }
 
 function genId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+
+// ===== IndexedDB FILE STORE =====
+const fileStore = {
+  _db: null,
+  async _open() {
+    if (this._db) return this._db;
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open('lawyer_files', 1);
+      req.onupgradeneeded = () => { if (!req.result.objectStoreNames.contains('files')) req.result.createObjectStore('files'); };
+      req.onsuccess = () => { this._db = req.result; resolve(req.result); };
+      req.onerror = () => reject(req.error);
+    });
+  },
+  async save(id, blob, filename) {
+    const db = await this._open();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction('files', 'readwrite');
+      tx.objectStore('files').put({ blob, filename, savedAt: Date.now() }, id);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  },
+  async get(id) {
+    const db = await this._open();
+    return new Promise((resolve) => {
+      const tx = db.transaction('files', 'readonly');
+      const req = tx.objectStore('files').get(id);
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror = () => resolve(null);
+    });
+  },
+  async remove(id) {
+    const db = await this._open();
+    return new Promise((resolve) => {
+      const tx = db.transaction('files', 'readwrite');
+      tx.objectStore('files').delete(id);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => resolve();
+    });
+  }
+};
+
+// ===== DATA MIGRATION =====
+function migrateData() {
+  const data = loadData();
+  let changed = false;
+  for (const h of data.hearings) {
+    if (!h.attachments) { h.attachments = []; changed = true; }
+    if (h.linkedCaseId === undefined) { h.linkedCaseId = null; changed = true; }
+  }
+  for (const c of data.cases) {
+    if (!c.attachments) { c.attachments = []; changed = true; }
+    if (c.hearingDate === undefined) { c.hearingDate = null; changed = true; }
+  }
+  if (changed) saveData(data);
+}
 
 // ===== APP STATE =====
 let currentTab = 'calendar';
@@ -1239,33 +1334,78 @@ function renderSelectedDate(hearings) {
   }
 
   const parts = selectedDate.split('-');
-  headerEl.style.display = 'block';
-  const wd = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2])).getDay();
+  const month = parseInt(parts[1]), day = parseInt(parts[2]);
+  const wd = new Date(parseInt(parts[0]), month - 1, day).getDay();
   const wdNames = ['日', '一', '二', '三', '四', '五', '六'];
-  headerEl.textContent = `${parseInt(parts[1])}月${parseInt(parts[2])}日 星期${wdNames[wd]} 的庭审`;
+  headerEl.style.display = 'block';
+  headerEl.textContent = `${month}月${day}日 星期${wdNames[wd]}`;
 
   if (!hearings) hearings = getHearings();
   const dayHearings = hearings.filter(h => h.hearingDate === selectedDate);
+  const allCases = getCases();
+  const linkedCases = allCases.filter(c => c.hearingDate === selectedDate);
+  // Also find cases linked from day's hearings
+  const linkedCaseIds = new Set(dayHearings.map(h => h.linkedCaseId).filter(Boolean));
+  const extraLinkedCases = allCases.filter(c => linkedCaseIds.has(c.id) && c.hearingDate !== selectedDate);
 
+  let html = '';
+
+  // === Section 1: Hearings ===
   if (dayHearings.length === 0) {
-    listEl.innerHTML = '<div class="no-data">当天无庭审安排</div>';
-    return;
+    html += '<div class="cal-section-title">📋 庭审记录 <span class="count">(0)</span></div>';
+    html += '<div class="no-data" style="padding:14px;">当天无庭审安排</div>';
+  } else {
+    dayHearings.sort((a, b) => a.hearingTime.localeCompare(b.hearingTime));
+    html += `<div class="cal-section-title">📋 庭审记录 <span class="count">(${dayHearings.length})</span></div>`;
+    html += dayHearings.map(h => `
+      <div class="hearing-card" onclick="openHearingForm('${h.id}')">
+        <div class="hc-top">
+          <span class="hc-name">${escHtml(h.caseName || '未命名案件')}</span>
+          <span class="hc-time">${h.hearingTime || '--:--'}</span>
+        </div>
+        <div class="hc-info">
+          ${h.courtName ? `<span>&#127963; ${escHtml(h.courtName)}</span>` : ''}
+          ${h.location ? `<span>&#128205; ${escHtml(h.location)}</span>` : ''}
+        </div>
+        ${h.caseNumber ? `<div class="hc-info" style="margin-top:2px;font-size:12px;color:var(--gray-500);">案号: ${escHtml(h.caseNumber)}</div>` : ''}
+        ${renderAttachLinks(h.attachments)}
+        ${h.linkedCaseId ? (() => { const lc = allCases.find(c => c.id === h.linkedCaseId); return lc ? `<div class="case-link-inline" onclick="event.stopPropagation();switchTab('cases');setTimeout(()=>document.getElementById('caseSearch').value='${escAttr(lc.clientName||'')}',200);document.getElementById('caseSearch').dispatchEvent(new Event('input'))">🔗 关联案件：${escHtml(lc.clientName||'')} ${escHtml(lc.projectName||'')}</div>` : ''; })() : ''}
+      </div>
+    `).join('');
   }
 
-  dayHearings.sort((a, b) => a.hearingTime.localeCompare(b.hearingTime));
-  listEl.innerHTML = dayHearings.map(h => `
-    <div class="hearing-card" onclick="openHearingForm('${h.id}')">
-      <div class="hc-top">
-        <span class="hc-name">${escHtml(h.caseName || '未命名案件')}</span>
-        <span class="hc-time">${h.hearingTime || '--:--'}</span>
+  // === Section 2: Linked Cases ===
+  const allRelatedCases = [...linkedCases];
+  for (const ec of extraLinkedCases) {
+    if (!allRelatedCases.find(c => c.id === ec.id)) allRelatedCases.push(ec);
+  }
+
+  if (allRelatedCases.length === 0) {
+    html += '<div class="cal-section-title">📁 关联案件 <span class="count">(0)</span></div>';
+    html += '<div class="no-data" style="padding:14px;">无关联案件</div>';
+  } else {
+    html += `<div class="cal-section-title">📁 关联案件 <span class="count">(${allRelatedCases.length})</span></div>`;
+    html += allRelatedCases.map(c => `
+      <div class="case-card" onclick="openCaseForm('${c.id}')" style="margin-bottom:8px;">
+        <div class="cc-header">
+          <div>
+            <div class="cc-client">${escHtml(c.clientName || '未填写客户')}</div>
+            <div class="cc-project">${escHtml(c.projectName || '')}</div>
+          </div>
+          ${c.contractSigned ? '<span class="badge badge-green">合同已签</span>' : '<span class="badge badge-gray">合同未签</span>'}
+        </div>
+        <div class="cc-badges">
+          ${statusBadge('支付', c.feePaymentStatus)}
+          ${statusBadge('开票', c.invoicingStatus)}
+          ${statusBadge('归档', c.archivingStatus)}
+        </div>
+        ${renderAttachLinks(c.attachments)}
+        ${c.hearingDate && c.hearingDate !== selectedDate ? `<div class="hc-info" style="margin-top:4px;font-size:12px;color:var(--accent);">📅 庭审日期: ${c.hearingDate}</div>` : ''}
       </div>
-      <div class="hc-info">
-        ${h.courtName ? `<span>&#127963; ${escHtml(h.courtName)}</span>` : ''}
-        ${h.location ? `<span>&#128205; ${escHtml(h.location)}</span>` : ''}
-      </div>
-      ${h.caseNumber ? `<div class="hc-info" style="margin-top:2px;font-size:12px;color:var(--gray-500);">案号: ${escHtml(h.caseNumber)}</div>` : ''}
-    </div>
-  `).join('');
+    `).join('');
+  }
+
+  listEl.innerHTML = html;
 }
 
 // ===== HEARING FORM =====
@@ -1275,6 +1415,14 @@ function openHearingForm(id) {
   const isEdit = !!h;
   const title = isEdit ? '编辑庭审' : '新增庭审';
   const dateVal = h ? h.hearingDate : (selectedDate || todayStr);
+
+  // Init pending attachments
+  setPendingAttachments(h ? (h.attachments || []) : []);
+
+  // Build linked case selector
+  const allCases = getCases();
+  const caseOptions = '<option value="">-- 无关联 --</option>' +
+    allCases.map(c => `<option value="${c.id}" ${h && h.linkedCaseId === c.id ? 'selected' : ''}>${escHtml(c.clientName||'')}${c.projectName ? ' — '+escHtml(c.projectName) : ''}</option>`).join('');
 
   const bodyHTML = `
     <div class="form-group">
@@ -1312,22 +1460,27 @@ function openHearingForm(id) {
       </div>
     </div>
     <div class="form-group">
+      <label class="form-label">关联案件</label>
+      <select class="form-select" id="hf-linkedCaseId">${caseOptions}</select>
+    </div>
+    <div class="form-group">
       <label class="form-label">备注</label>
       <textarea class="form-textarea" id="hf-notes" placeholder="其他需要记录的信息...">${escHtml(h ? h.notes : '')}</textarea>
     </div>
+    ${renderAttachEditor(h ? (h.attachments || []) : [], HEARING_LABELS)}
   `;
 
   const footerHTML = `
     ${isEdit ? `<button class="btn btn-danger btn-sm" onclick="deleteHearing('${id}')">删除</button>` : ''}
     <div style="flex:1;"></div>
     <button class="btn btn-outline btn-sm" onclick="closeModal()">取消</button>
-    <button class="btn btn-primary btn-sm" onclick="saveHearing('${isEdit ? id : ''}')">保存</button>
+    <button class="btn btn-primary btn-sm" id="saveHearingBtn" onclick="saveHearingAsync('${isEdit ? id : ''}')">保存</button>
   `;
 
   openModal(title, bodyHTML, footerHTML);
 }
 
-function saveHearing(id) {
+async function saveHearingAsync(id) {
   const caseName = document.getElementById('hf-caseName').value.trim();
   const hearingDate = document.getElementById('hf-hearingDate').value;
   if (!caseName || !hearingDate) {
@@ -1335,42 +1488,70 @@ function saveHearing(id) {
     return;
   }
 
-  const hearings = getHearings();
-  const obj = {
-    id: id || genId(),
-    caseName,
-    caseNumber: document.getElementById('hf-caseNumber').value.trim(),
-    courtName: document.getElementById('hf-courtName').value.trim(),
-    hearingDate,
-    hearingTime: document.getElementById('hf-hearingTime').value,
-    location: document.getElementById('hf-location').value.trim(),
-    judge: document.getElementById('hf-judge').value.trim(),
-    notes: document.getElementById('hf-notes').value.trim()
-  };
+  const saveBtn = document.getElementById('saveHearingBtn');
+  saveBtn.disabled = true;
+  saveBtn.textContent = '保存中...';
 
-  if (id) {
-    const idx = hearings.findIndex(h => h.id === id);
-    if (idx >= 0) hearings[idx] = obj;
-  } else {
-    hearings.push(obj);
+  try {
+    const attachments = await savePendingAttachments();
+    const hearings = getHearings();
+    const obj = {
+      id: id || genId(),
+      caseName,
+      caseNumber: document.getElementById('hf-caseNumber').value.trim(),
+      courtName: document.getElementById('hf-courtName').value.trim(),
+      hearingDate,
+      hearingTime: document.getElementById('hf-hearingTime').value,
+      location: document.getElementById('hf-location').value.trim(),
+      judge: document.getElementById('hf-judge').value.trim(),
+      linkedCaseId: document.getElementById('hf-linkedCaseId').value || null,
+      notes: document.getElementById('hf-notes').value.trim(),
+      attachments
+    };
+
+    if (id) {
+      const old = hearings.find(h => h.id === id);
+      if (old && old.attachments) {
+        // Remove attachments that were deleted
+        const newIds = new Set(attachments.map(a => a.id));
+        for (const oldA of old.attachments) {
+          if (!newIds.has(oldA.id)) await fileStore.remove(oldA.id);
+        }
+      }
+      const idx = hearings.findIndex(h => h.id === id);
+      if (idx >= 0) hearings[idx] = obj;
+    } else {
+      hearings.push(obj);
+    }
+
+    saveHearings(hearings);
+    closeModal();
+    selectedDate = hearingDate;
+    calendarYear = parseInt(hearingDate.split('-')[0]);
+    calendarMonth = parseInt(hearingDate.split('-')[1]) - 1;
+    renderCalendar();
+    updateStorageStats();
+    showToast(id ? '庭审已更新' : '庭审已添加');
+  } catch (err) {
+    showToast('保存失败：' + err.message, 'error');
+  } finally {
+    saveBtn.disabled = false;
+    saveBtn.textContent = '保存';
   }
+}
 
-  saveHearings(hearings);
-  closeModal();
-  // Auto select the hearing's date
-  selectedDate = hearingDate;
-  calendarYear = parseInt(hearingDate.split('-')[0]);
-  calendarMonth = parseInt(hearingDate.split('-')[1]) - 1;
-  renderCalendar();
-  updateStorageStats();
-  showToast(id ? '庭审已更新' : '庭审已添加');
+function saveHearing(id) {
+  // Deprecated wrapper for existing inline calls (still used by old code paths)
+  // Actual save goes through saveHearingAsync
 }
 
 function deleteHearing(id) {
   closeModal();
-  showConfirm('确定删除这条庭审记录吗？', () => {
-    const hearings = getHearings().filter(h => h.id !== id);
-    saveHearings(hearings);
+  showConfirm('确定删除这条庭审记录吗？附件也将一并删除。', async () => {
+    const hearings = getHearings();
+    const h = hearings.find(x => x.id === id);
+    if (h && h.attachments) await deleteAttachments(h.attachments);
+    saveHearings(hearings.filter(x => x.id !== id));
     renderCalendar();
     updateStorageStats();
     showToast('庭审已删除');
@@ -1493,7 +1674,9 @@ function renderCases() {
         ${statusBadge('开票', c.invoicingStatus)}
         ${statusBadge('归档', c.archivingStatus)}
       </div>
+      ${c.hearingDate ? `<div style="margin-top:6px;font-size:12px;color:var(--accent);font-weight:500;">📅 庭审日期: ${c.hearingDate}</div>` : ''}
       ${c.projectProgress ? `<div class="cc-progress">${escHtml(c.projectProgress.length > 80 ? c.projectProgress.substring(0, 80) + '...' : c.projectProgress)}</div>` : ''}
+      ${renderAttachLinks(c.attachments)}
     </div>
   `).join('');
 }
@@ -1517,6 +1700,12 @@ function openCaseForm(id) {
   const isEdit = !!c;
   const title = isEdit ? '编辑案件' : '新增案件';
 
+  // Init pending attachments
+  setPendingAttachments(c ? (c.attachments || []) : []);
+
+  // Default hearing date from calendar selection
+  const defHearingDate = c ? c.hearingDate : (selectedDate || '');
+
   const bodyHTML = `
     <div class="form-section-title">基本信息</div>
     <div class="form-group">
@@ -1526,6 +1715,10 @@ function openCaseForm(id) {
     <div class="form-group">
       <label class="form-label">项目/案件名称</label>
       <input class="form-input" id="cf-projectName" value="${escAttr(c ? c.projectName : '')}" placeholder="如：2026年度法律顾问">
+    </div>
+    <div class="form-group">
+      <label class="form-label">庭审日期（关联到日历）</label>
+      <input class="form-input" type="date" id="cf-hearingDate" value="${defHearingDate || ''}">
     </div>
 
     <div class="form-section-title">合同信息</div>
@@ -1588,13 +1781,14 @@ function openCaseForm(id) {
       <label class="form-label">备注</label>
       <textarea class="form-textarea" id="cf-notes" placeholder="其他备注信息...">${escHtml(c ? c.notes : '')}</textarea>
     </div>
+    ${renderAttachEditor(c ? (c.attachments || []) : [], CASE_LABELS)}
   `;
 
   const footerHTML = `
     ${isEdit ? `<button class="btn btn-danger btn-sm" onclick="deleteCase('${id}')">删除</button>` : ''}
     <div style="flex:1;"></div>
     <button class="btn btn-outline btn-sm" onclick="closeModal()">取消</button>
-    <button class="btn btn-primary btn-sm" onclick="saveCase('${isEdit ? id : ''}')">保存</button>
+    <button class="btn btn-primary btn-sm" id="saveCaseBtn" onclick="saveCaseAsync('${isEdit ? id : ''}')">保存</button>
   `;
 
   openModal(title, bodyHTML, footerHTML);
@@ -1604,59 +1798,73 @@ function toggleSwitch(el) {
   const sw = el.querySelector('.toggle-switch');
   const label = el.querySelector('span');
   const isOn = sw.classList.contains('on');
-  if (isOn) {
-    sw.classList.remove('on');
-    label.textContent = '未签署';
-  } else {
-    sw.classList.add('on');
-    label.textContent = '已签署';
+  if (isOn) { sw.classList.remove('on'); label.textContent = '未签署'; }
+  else { sw.classList.add('on'); label.textContent = '已签署'; }
+}
+
+async function saveCaseAsync(id) {
+  const clientName = document.getElementById('cf-clientName').value.trim();
+  if (!clientName) { showToast('请填写客户名称', 'error'); return; }
+
+  const saveBtn = document.getElementById('saveCaseBtn');
+  saveBtn.disabled = true; saveBtn.textContent = '保存中...';
+
+  try {
+    const attachments = await savePendingAttachments();
+    const contractSignedEl = document.getElementById('cf-contractSigned');
+    const cases = getCases();
+    const obj = {
+      id: id || genId(),
+      clientName,
+      projectName: document.getElementById('cf-projectName').value.trim(),
+      hearingDate: document.getElementById('cf-hearingDate').value || null,
+      contractSigned: contractSignedEl.classList.contains('on'),
+      contractDate: document.getElementById('cf-contractDate').value,
+      feeArrangement: document.getElementById('cf-feeArrangement').value.trim(),
+      paymentTerms: document.getElementById('cf-paymentTerms').value.trim(),
+      feePaymentStatus: document.getElementById('cf-feePaymentStatus').value,
+      invoicingStatus: document.getElementById('cf-invoicingStatus').value,
+      archivingStatus: document.getElementById('cf-archivingStatus').value,
+      projectProgress: document.getElementById('cf-projectProgress').value.trim(),
+      notes: document.getElementById('cf-notes').value.trim(),
+      attachments
+    };
+
+    if (id) {
+      const old = cases.find(c => c.id === id);
+      if (old && old.attachments) {
+        const newIds = new Set(attachments.map(a => a.id));
+        for (const oldA of old.attachments) { if (!newIds.has(oldA.id)) await fileStore.remove(oldA.id); }
+      }
+      const idx = cases.findIndex(c => c.id === id);
+      if (idx >= 0) cases[idx] = obj;
+    } else {
+      cases.push(obj);
+    }
+
+    saveCases(cases);
+    closeModal();
+    renderCases();
+    updateStorageStats();
+    showToast(id ? '案件已更新' : '案件已添加');
+  } catch (err) {
+    showToast('保存失败：' + err.message, 'error');
+  } finally {
+    saveBtn.disabled = false; saveBtn.textContent = '保存';
   }
 }
 
 function saveCase(id) {
-  const clientName = document.getElementById('cf-clientName').value.trim();
-  if (!clientName) {
-    showToast('请填写客户名称', 'error');
-    return;
-  }
-
-  const contractSignedEl = document.getElementById('cf-contractSigned');
-
-  const cases = getCases();
-  const obj = {
-    id: id || genId(),
-    clientName,
-    projectName: document.getElementById('cf-projectName').value.trim(),
-    contractSigned: contractSignedEl.classList.contains('on'),
-    contractDate: document.getElementById('cf-contractDate').value,
-    feeArrangement: document.getElementById('cf-feeArrangement').value.trim(),
-    paymentTerms: document.getElementById('cf-paymentTerms').value.trim(),
-    feePaymentStatus: document.getElementById('cf-feePaymentStatus').value,
-    invoicingStatus: document.getElementById('cf-invoicingStatus').value,
-    archivingStatus: document.getElementById('cf-archivingStatus').value,
-    projectProgress: document.getElementById('cf-projectProgress').value.trim(),
-    notes: document.getElementById('cf-notes').value.trim()
-  };
-
-  if (id) {
-    const idx = cases.findIndex(c => c.id === id);
-    if (idx >= 0) cases[idx] = obj;
-  } else {
-    cases.push(obj);
-  }
-
-  saveCases(cases);
-  closeModal();
-  renderCases();
-  updateStorageStats();
-  showToast(id ? '案件已更新' : '案件已添加');
+  // Deprecated - routing through saveCaseAsync
 }
 
 function deleteCase(id) {
   closeModal();
-  showConfirm('确定删除这个案件吗？', () => {
-    const cases = getCases().filter(c => c.id !== id);
-    saveCases(cases);
+  showConfirm('确定删除这个案件吗？附件也将一并删除。', async () => {
+    const cases = getCases();
+    const c = cases.find(x => x.id === id);
+    if (c && c.attachments) await deleteAttachments(c.attachments);
+    saveCases(cases.filter(x => x.id !== id));
     renderCases();
     updateStorageStats();
     showToast('案件已删除');
@@ -1667,6 +1875,7 @@ function deleteCase(id) {
 let pdfjsLoaded = false;
 let mammothLoaded = false;
 let pendingImportType = null; // 'summons' or 'contract'
+let pendingImportFile = null; // original file blob for attachment
 
 function loadScript(src) {
   return new Promise((resolve, reject) => {
@@ -1887,7 +2096,10 @@ async function handleFileSelect(event) {
       fields = extractContractFields(text);
     }
 
-    // Show review modal
+    // Store original file for attachment
+  pendingImportFile = file;
+
+  // Show review modal
     showRecognitionReview(docType, fields, text);
 
   } catch (err) {
@@ -2007,13 +2219,21 @@ function toggleRawText() {
   document.getElementById('rawTextPreview').classList.toggle('open');
 }
 
-function confirmRecognitionImport(docType) {
+async function confirmRecognitionImport(docType) {
   if (docType === 'summons') {
     const caseName = document.getElementById('rf-caseName').value.trim();
     const hearingDate = document.getElementById('rf-hearingDate').value;
     if (!caseName || !hearingDate) {
       showToast('请至少填写案件名称和开庭日期', 'error');
       return;
+    }
+    // Save file as attachment
+    let attachments = [];
+    if (pendingImportFile) {
+      const attId = genId();
+      await fileStore.save(attId, pendingImportFile, pendingImportFile.name);
+      attachments = [{ id: attId, label: '传票', fileName: pendingImportFile.name, fileSize: pendingImportFile.size }];
+      pendingImportFile = null;
     }
     const hearings = getHearings();
     hearings.push({
@@ -2025,6 +2245,8 @@ function confirmRecognitionImport(docType) {
       hearingTime: document.getElementById('rf-hearingTime').value,
       location: document.getElementById('rf-location').value.trim(),
       judge: document.getElementById('rf-judge').value.trim(),
+      linkedCaseId: null,
+      attachments,
       notes: '【文件识别导入】'
     });
     saveHearings(hearings);
@@ -2041,12 +2263,21 @@ function confirmRecognitionImport(docType) {
       showToast('请至少填写客户名称', 'error');
       return;
     }
+    // Save file as attachment
+    let attachments = [];
+    if (pendingImportFile) {
+      const attId = genId();
+      await fileStore.save(attId, pendingImportFile, pendingImportFile.name);
+      attachments = [{ id: attId, label: '合同', fileName: pendingImportFile.name, fileSize: pendingImportFile.size }];
+      pendingImportFile = null;
+    }
     const contractSignedEl = document.getElementById('rf-contractSigned');
     const cases = getCases();
     cases.push({
       id: genId(),
       clientName,
       projectName: document.getElementById('rf-projectName').value.trim(),
+      hearingDate: null,
       contractSigned: contractSignedEl.classList.contains('on'),
       contractDate: document.getElementById('rf-contractDate').value,
       feeArrangement: document.getElementById('rf-feeArrangement').value.trim(),
@@ -2055,6 +2286,7 @@ function confirmRecognitionImport(docType) {
       invoicingStatus: '未开票',
       archivingStatus: '未归档',
       projectProgress: document.getElementById('rf-projectProgress').value.trim(),
+      attachments,
       notes: '【文件识别导入】'
     });
     saveCases(cases);
@@ -2062,6 +2294,118 @@ function confirmRecognitionImport(docType) {
     switchTab('cases');
     updateStorageStats();
     showToast('合同信息已导入案件管理');
+  }
+}
+
+// ===== ATTACHMENT HELPERS =====
+const HEARING_LABELS = ['传票', '出庭通知书', '授权委托书', '其他'];
+const CASE_LABELS = ['起诉状', '证据清单', '答辩状', '代理词', '判决书', '裁定书', '合同', '其他'];
+
+function renderAttachLinks(attachments) {
+  if (!attachments || attachments.length === 0) return '';
+  return '<div class="attach-list">' + attachments.map(a =>
+    `<span class="attach-link" onclick="event.stopPropagation();openAttachment('${a.id}')" title="${escHtml(a.fileName)}">
+      <span class="attach-label-tag">${escHtml(a.label)}</span>${escHtml(a.fileName.length > 12 ? a.fileName.slice(0,12)+'...' : a.fileName)}
+    </span>`
+  ).join('') + '</div>';
+}
+
+function renderAttachEditor(attachments, labelOptions) {
+  const list = (attachments || []).map(a =>
+    `<span class="attach-link" style="margin:2px;" title="${escHtml(a.fileName)}">
+      <span class="attach-label-tag">${escHtml(a.label)}</span>${escHtml(a.fileName.length > 10 ? a.fileName.slice(0,10)+'...' : a.fileName)}
+      <span class="attach-delete" onclick="event.stopPropagation();removeAttachment(this, '${a.id}')">&times;</span>
+    </span>`
+  ).join('');
+
+  const options = labelOptions.map(l => `<option value="${l}">${l}</option>`).join('');
+
+  return `
+    <div class="form-section-title">📎 附件材料</div>
+    <div class="attach-list" id="attachEditorList" style="min-height:8px;">${list || '<span style="font-size:12px;color:var(--gray-500);">暂无附件</span>'}</div>
+    <div class="attach-add-row">
+      <select id="attachLabelSelect">${options}</select>
+      <button class="btn btn-outline btn-sm" onclick="triggerAttachmentUpload()">+ 添加文件</button>
+    </div>
+    <input type="file" id="attachFileInput" style="display:none" accept=".pdf,.docx,.doc,.xlsx,.xls,.png,.jpg,.jpeg" onchange="handleAttachmentUpload(event)">
+  `;
+}
+
+// Temp storage for pending attachments during form editing
+let _pendingAttachments = [];
+let _pendingFileBlobs = {};
+
+function setPendingAttachments(attachments) {
+  _pendingAttachments = JSON.parse(JSON.stringify(attachments || []));
+  _pendingFileBlobs = {};
+}
+
+function getPendingAttachments() { return _pendingAttachments; }
+
+function triggerAttachmentUpload() {
+  document.getElementById('attachFileInput').click();
+}
+
+async function handleAttachmentUpload(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  event.target.value = '';
+  const label = document.getElementById('attachLabelSelect').value;
+  const id = genId();
+  _pendingFileBlobs[id] = file;
+  _pendingAttachments.push({ id, label, fileName: file.name, fileSize: file.size });
+  refreshAttachmentEditorUI();
+  showToast('文件已添加：' + file.name);
+}
+
+function removeAttachment(el, id) {
+  el.parentElement.remove();
+  _pendingAttachments = _pendingAttachments.filter(a => a.id !== id);
+  delete _pendingFileBlobs[id];
+  refreshAttachmentEditorUI();
+}
+
+function refreshAttachmentEditorUI() {
+  const container = document.getElementById('attachEditorList');
+  if (!container) return;
+  if (_pendingAttachments.length === 0) {
+    container.innerHTML = '<span style="font-size:12px;color:var(--gray-500);">暂无附件</span>';
+    return;
+  }
+  container.innerHTML = _pendingAttachments.map(a =>
+    `<span class="attach-link" style="margin:2px;" title="${escHtml(a.fileName)}">
+      <span class="attach-label-tag">${escHtml(a.label)}</span>${escHtml(a.fileName.length > 10 ? a.fileName.slice(0,10)+'...' : a.fileName)}
+      <span class="attach-delete" onclick="event.stopPropagation();removeAttachment(this, '${a.id}')">&times;</span>
+    </span>`
+  ).join('');
+}
+
+async function savePendingAttachments() {
+  const promises = [];
+  for (const a of _pendingAttachments) {
+    if (_pendingFileBlobs[a.id]) {
+      promises.push(fileStore.save(a.id, _pendingFileBlobs[a.id], a.fileName));
+    }
+  }
+  await Promise.all(promises);
+  const result = _pendingAttachments.map(a => ({ id: a.id, label: a.label, fileName: a.fileName, fileSize: a.fileSize }));
+  _pendingAttachments = [];
+  _pendingFileBlobs = {};
+  return result;
+}
+
+async function openAttachment(id) {
+  const file = await fileStore.get(id);
+  if (!file) { showToast('文件不存在或已被清理', 'error'); return; }
+  const url = URL.createObjectURL(file.blob);
+  window.open(url, '_blank');
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
+
+async function deleteAttachments(attachments) {
+  if (!attachments || attachments.length === 0) return;
+  for (const a of attachments) {
+    await fileStore.remove(a.id);
   }
 }
 
@@ -2091,19 +2435,91 @@ function refreshAll() {
   else renderCases();
 }
 
+// ===== PWA SHARE TARGET =====
+async function processSharedFile() {
+  try {
+    const cache = await caches.open('shared-files');
+    const response = await cache.match('/pending-shared-file');
+    if (!response) { showToast('未找到共享文件', 'error'); return; }
+    const blob = await response.blob();
+    await cache.delete('/pending-shared-file');
+
+    const filename = decodeURIComponent(
+      response.headers.get('X-Shared-Filename') || 'unknown.pdf'
+    );
+    await handleSharedBlob(blob, filename);
+  } catch (err) {
+    console.error('Shared file processing error:', err);
+    showToast('共享文件处理失败', 'error');
+  }
+}
+
+async function handleSharedBlob(blob, filename) {
+  document.getElementById('loadingOverlay').classList.add('open');
+  document.getElementById('loadingText').textContent = '正在解析共享文件...';
+
+  try {
+    const isPDF = filename.toLowerCase().endsWith('.pdf') || blob.type === 'application/pdf';
+    const isDocx = filename.toLowerCase().endsWith('.docx') ||
+      blob.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+
+    if (!isPDF && !isDocx) {
+      document.getElementById('loadingOverlay').classList.remove('open');
+      showToast('不支持的文件格式', 'error');
+      return;
+    }
+
+    let text = '';
+    if (isPDF) {
+      await ensurePDFJS();
+      document.getElementById('loadingText').textContent = '正在提取PDF文本...';
+      text = await extractPDFText(blob);
+    } else {
+      await ensureMammoth();
+      document.getElementById('loadingText').textContent = '正在提取Word文本...';
+      text = await extractDocxText(blob);
+    }
+
+    document.getElementById('loadingOverlay').classList.remove('open');
+
+    if (!text || text.length < 10) {
+      showToast('未能提取到文字内容。此文件可能为扫描件（图片格式），无法识别。', 'error');
+      return;
+    }
+
+    // Store blob for attachment use
+    pendingImportFile = new File([blob], filename, { type: blob.type });
+
+    const docType = classifyDocument(text);
+    let fields = {};
+    if (docType === 'summons') {
+      fields = extractSummonsFields(text);
+    } else {
+      fields = extractContractFields(text);
+    }
+
+    showRecognitionReview(docType || 'summons', fields, text);
+  } catch (err) {
+    document.getElementById('loadingOverlay').classList.remove('open');
+    console.error('Shared file error:', err);
+    showToast('文件解析失败：' + (err.message || '格式不支持'), 'error');
+  }
+}
+
 // ===== INIT =====
 function init() {
+  migrateData();
   updateHeaderDate();
   setInterval(updateHeaderDate, 60000);
   renderCalendar();
   updateStorageStats();
 
-  // Register Service Worker (PWA)
+  // Register Service Worker for PWA
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').catch(() => {});
   }
 
-  // Check for shared file (from share target)
+  // Check for shared file from PWA share target
   if (window.location.search.includes('shared=1')) {
     setTimeout(() => processSharedFile(), 500);
   }
@@ -2132,79 +2548,6 @@ function init() {
     const parts = selectedDate.split('-');
     calendarYear = parseInt(parts[0]);
     calendarMonth = parseInt(parts[1]) - 1;
-  }
-}
-
-// ===== SHARED FILE PROCESSING =====
-async function processSharedFile() {
-  // Clean URL param
-  window.history.replaceState({}, '', location.pathname);
-
-  try {
-    const cache = await caches.open('shared-files');
-    const response = await cache.match('/pending-shared-file');
-    if (!response) {
-      showToast('未找到共享文件', 'error');
-      return;
-    }
-    const blob = await response.blob();
-    await cache.delete('/pending-shared-file');
-
-    const filename = decodeURIComponent(
-      response.headers.get('X-Shared-Filename') || 'unknown.pdf'
-    );
-    await handleSharedBlob(blob, filename);
-  } catch (err) {
-    console.error('Shared file processing error:', err);
-    showToast('共享文件处理失败', 'error');
-  }
-}
-
-async function handleSharedBlob(blob, filename) {
-  document.getElementById('loadingOverlay').classList.add('open');
-  document.getElementById('loadingText').textContent = '正在解析共享文件...';
-
-  try {
-    const isPDF = filename.toLowerCase().endsWith('.pdf') || blob.type === 'application/pdf';
-    const isDocx = filename.toLowerCase().endsWith('.docx') ||
-      blob.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
-
-    let text = '';
-
-    if (isPDF) {
-      await ensurePDFJS();
-      document.getElementById('loadingText').textContent = '正在提取PDF文本...';
-      text = await extractPDFText(blob);
-    } else if (isDocx) {
-      await ensureMammoth();
-      document.getElementById('loadingText').textContent = '正在提取Word文本...';
-      text = await extractDocxText(blob);
-    } else {
-      document.getElementById('loadingOverlay').classList.remove('open');
-      showToast('不支持的文件格式', 'error');
-      return;
-    }
-
-    document.getElementById('loadingOverlay').classList.remove('open');
-
-    if (!text || text.length < 10) {
-      showToast('未能提取到文字内容。此文件可能为扫描件（图片格式），无法识别。', 'error');
-      return;
-    }
-
-    const docType = classifyDocument(text);
-    let fields = {};
-    if (docType === 'summons') {
-      fields = extractSummonsFields(text);
-    } else {
-      fields = extractContractFields(text);
-    }
-
-    showRecognitionReview(docType || 'summons', fields, text);
-  } catch (err) {
-    document.getElementById('loadingOverlay').classList.remove('open');
-    console.error('Shared file error:', err);
-    showToast('文件解析失败：' + (err.message || '格式不支持'), 'error');
   }
 }
 
