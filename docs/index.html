@@ -2100,7 +2100,7 @@ function init() {
 
   // Register Service Worker (PWA)
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('sw.js', { scope: '/lawyer-assistant/' }).catch(() => {});
+    navigator.serviceWorker.register('sw.js').catch(() => {});
   }
 
   // Check for shared file (from share target)
