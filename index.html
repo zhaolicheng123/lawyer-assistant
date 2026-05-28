@@ -1,0 +1,2215 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="律师工作助手">
+<meta name="theme-color" content="#1a3a5c">
+<meta name="description" content="律师工作记录工具">
+<link rel="manifest" href="manifest.json">
+<title>律师工作助手</title>
+<style>
+/* ===== CSS Variables ===== */
+:root {
+  --primary: #1a3a5c;
+  --primary-light: #2c5f8a;
+  --primary-bg: #e8f0f8;
+  --accent: #c49b3f;
+  --accent-bg: #fdf6e8;
+  --danger: #c0392b;
+  --danger-bg: #fdecea;
+  --success: #27ae60;
+  --success-bg: #e8f8ef;
+  --warning: #e67e22;
+  --warning-bg: #fef5ec;
+  --gray-100: #f5f6f8;
+  --gray-200: #e8eaed;
+  --gray-300: #d0d3d8;
+  --gray-500: #8a8f97;
+  --gray-700: #4a4f56;
+  --gray-900: #1a1c1e;
+  --white: #ffffff;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.08);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.12);
+  --shadow-lg: 0 8px 24px rgba(0,0,0,0.16);
+  --radius-sm: 6px;
+  --radius: 10px;
+  --radius-lg: 14px;
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --tab-height: 60px;
+  --header-height: 50px;
+}
+
+/* ===== Reset ===== */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: var(--font);
+  background: var(--gray-100);
+  color: var(--gray-900);
+  min-height: 100vh;
+  min-height: 100dvh;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ===== App Container ===== */
+.app {
+  max-width: 800px;
+  margin: 0 auto;
+  background: var(--white);
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  box-shadow: var(--shadow-lg);
+}
+
+/* ===== Header ===== */
+.header {
+  height: var(--header-height);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  background: var(--primary);
+  color: var(--white);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  flex-shrink: 0;
+}
+.header-title {
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+.header-date {
+  font-size: 12px;
+  opacity: 0.85;
+}
+.header-actions {
+  display: flex;
+  gap: 8px;
+}
+.icon-btn {
+  width: 32px; height: 32px;
+  border: none; background: rgba(255,255,255,0.15);
+  color: var(--white); border-radius: 50%;
+  font-size: 16px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.15s;
+}
+.icon-btn:hover { background: rgba(255,255,255,0.25); }
+.icon-btn:active { background: rgba(255,255,255,0.35); }
+
+/* ===== Main Content ===== */
+.main {
+  flex: 1;
+  overflow-y: auto;
+  padding-bottom: calc(var(--tab-height) + 8px);
+  -webkit-overflow-scrolling: touch;
+}
+.tab-content { display: none; padding: 12px 14px; }
+.tab-content.active { display: block; }
+
+/* ===== Bottom Tabs ===== */
+.tabs {
+  position: fixed;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 800px;
+  height: var(--tab-height);
+  background: var(--white);
+  border-top: 1px solid var(--gray-200);
+  display: flex;
+  z-index: 100;
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+.tab {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: none;
+  color: var(--gray-500);
+  font-size: 11px;
+  cursor: pointer;
+  transition: color 0.15s;
+  gap: 3px;
+  font-family: var(--font);
+}
+.tab.active { color: var(--primary); }
+.tab-icon { font-size: 20px; line-height: 1; }
+.tab-label { font-weight: 500; }
+
+/* ===== Calendar ===== */
+.calendar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.calendar-month {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--gray-900);
+}
+.calendar-nav {
+  display: flex;
+  gap: 4px;
+}
+.calendar-nav button {
+  width: 34px; height: 34px;
+  border: 1px solid var(--gray-300);
+  background: var(--white);
+  border-radius: var(--radius-sm);
+  font-size: 16px;
+  cursor: pointer;
+  color: var(--gray-700);
+  transition: all 0.15s;
+}
+.calendar-nav button:hover { background: var(--gray-100); }
+.calendar-nav button:active { background: var(--primary-bg); color: var(--primary); }
+.calendar-today-btn {
+  font-size: 12px;
+  width: auto;
+  padding: 0 10px;
+}
+.weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  text-align: center;
+  font-size: 12px;
+  color: var(--gray-500);
+  font-weight: 600;
+  margin-bottom: 4px;
+  padding: 4px 0;
+}
+.weekdays .weekend { color: var(--danger); }
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+.calendar-cell {
+  aspect-ratio: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 4px 2px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  position: relative;
+  transition: background 0.15s;
+  border: 2px solid transparent;
+}
+.calendar-cell:hover { background: var(--gray-100); }
+.calendar-cell.other-month { color: var(--gray-300); cursor: default; }
+.calendar-cell.today {
+  border-color: var(--primary);
+  font-weight: 700;
+}
+.calendar-cell.selected {
+  background: var(--primary-bg);
+  border-color: var(--primary-light);
+}
+.calendar-cell .dot {
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: var(--accent);
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+.calendar-cell .dots {
+  display: flex;
+  gap: 2px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-top: 1px;
+}
+
+/* Selected date hearings */
+.selected-date-header {
+  margin-top: 12px;
+  padding: 8px 12px;
+  background: var(--primary-bg);
+  border-radius: var(--radius);
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--primary);
+}
+.hearing-list { margin-top: 8px; display: flex; flex-direction: column; gap: 8px; }
+.hearing-card {
+  padding: 12px 14px;
+  background: var(--white);
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: box-shadow 0.15s;
+}
+.hearing-card:hover { box-shadow: var(--shadow-sm); }
+.hearing-card .hc-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+.hearing-card .hc-name { font-weight: 600; font-size: 15px; color: var(--gray-900); }
+.hearing-card .hc-time { font-size: 13px; color: var(--accent); font-weight: 600; white-space: nowrap; margin-left: 8px; }
+.hearing-card .hc-info { margin-top: 4px; font-size: 13px; color: var(--gray-700); }
+.hearing-card .hc-info span { margin-right: 12px; }
+.no-data {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--gray-500);
+  font-size: 14px;
+}
+
+/* ===== Tasks ===== */
+.task-input-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.task-input {
+  flex: 1;
+  padding: 10px 14px;
+  border: 2px solid var(--gray-200);
+  border-radius: var(--radius);
+  font-size: 15px;
+  font-family: var(--font);
+  outline: none;
+  transition: border-color 0.15s;
+}
+.task-input:focus { border-color: var(--primary-light); }
+.btn {
+  padding: 10px 18px;
+  border: none;
+  border-radius: var(--radius);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: var(--font);
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.btn-primary { background: var(--primary); color: var(--white); }
+.btn-primary:hover { background: var(--primary-light); }
+.btn-primary:active { transform: scale(0.97); }
+.btn-sm { padding: 6px 12px; font-size: 12px; border-radius: var(--radius-sm); }
+.btn-outline {
+  background: var(--white);
+  color: var(--primary);
+  border: 1.5px solid var(--primary);
+}
+.btn-outline:hover { background: var(--primary-bg); }
+.btn-danger { background: var(--danger); color: var(--white); }
+.btn-danger:hover { background: #a93226; }
+
+.task-count {
+  font-size: 13px;
+  color: var(--gray-500);
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+.task-list { display: flex; flex-direction: column; }
+.task-item {
+  display: flex;
+  align-items: center;
+  padding: 11px 12px;
+  gap: 10px;
+  border-bottom: 1px solid var(--gray-100);
+  transition: background 0.15s;
+}
+.task-item:active { background: var(--gray-100); }
+.task-check {
+  width: 22px; height: 22px;
+  border: 2px solid var(--gray-300);
+  border-radius: 50%;
+  flex-shrink: 0;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.2s;
+  font-size: 12px;
+  color: transparent;
+}
+.task-check:hover { border-color: var(--success); }
+.task-item.completed .task-check {
+  background: var(--success);
+  border-color: var(--success);
+  color: var(--white);
+}
+.task-item.completed .task-title {
+  text-decoration: line-through;
+  color: var(--gray-500);
+}
+.task-title { flex: 1; font-size: 15px; }
+.task-delete {
+  width: 28px; height: 28px;
+  border: none; background: none;
+  color: var(--gray-300); font-size: 18px;
+  cursor: pointer; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+.task-delete:hover { color: var(--danger); background: var(--danger-bg); }
+.tasks-done-header {
+  display: flex; align-items: center; gap: 6px;
+  margin-top: 16px; margin-bottom: 8px;
+  padding: 8px 0;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--gray-500);
+  font-weight: 500;
+  border-top: 1px solid var(--gray-200);
+}
+.tasks-done-header .arrow { transition: transform 0.2s; font-size: 10px; }
+.tasks-done-header.open .arrow { transform: rotate(90deg); }
+.tasks-done { display: none; }
+.tasks-done.open { display: block; }
+
+/* ===== Cases ===== */
+.case-search {
+  width: 100%;
+  padding: 10px 14px;
+  border: 2px solid var(--gray-200);
+  border-radius: var(--radius);
+  font-size: 15px;
+  font-family: var(--font);
+  outline: none;
+  margin-bottom: 12px;
+}
+.case-search:focus { border-color: var(--primary-light); }
+.case-list { display: flex; flex-direction: column; gap: 10px; }
+.case-card {
+  padding: 14px;
+  background: var(--white);
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: box-shadow 0.15s;
+}
+.case-card:hover { box-shadow: var(--shadow-sm); }
+.case-card .cc-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 8px;
+}
+.case-card .cc-client { font-size: 15px; font-weight: 700; color: var(--gray-900); }
+.case-card .cc-project { font-size: 13px; color: var(--gray-500); margin-top: 1px; }
+.case-card .cc-badges { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
+.badge {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.badge-green { background: var(--success-bg); color: var(--success); }
+.badge-red { background: var(--danger-bg); color: var(--danger); }
+.badge-orange { background: var(--warning-bg); color: var(--warning); }
+.badge-gray { background: var(--gray-100); color: var(--gray-700); }
+.badge-blue { background: var(--primary-bg); color: var(--primary); }
+.case-card .cc-progress {
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--gray-700);
+  line-height: 1.4;
+}
+
+/* ===== FAB ===== */
+.fab {
+  position: fixed;
+  bottom: calc(var(--tab-height) + 16px + env(safe-area-inset-bottom, 0px));
+  right: calc(50% - 400px + 16px);
+  width: 48px; height: 48px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: var(--white);
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  box-shadow: var(--shadow-md);
+  z-index: 90;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.2s;
+}
+.fab:hover { background: var(--primary-light); }
+.fab:active { transform: scale(0.93); }
+
+@media (max-width: 800px) {
+  .fab { right: 16px; }
+}
+
+/* ===== Modal ===== */
+.modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+  z-index: 200;
+  align-items: flex-end;
+  justify-content: center;
+}
+.modal-overlay.open { display: flex; }
+.modal {
+  background: var(--white);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  width: 100%;
+  max-width: 800px;
+  max-height: 88vh;
+  max-height: 88dvh;
+  display: flex;
+  flex-direction: column;
+  animation: slideUp 0.25s ease-out;
+}
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--gray-200);
+  flex-shrink: 0;
+}
+.modal-title { font-size: 17px; font-weight: 700; }
+.modal-close {
+  width: 30px; height: 30px;
+  border: none; background: var(--gray-100);
+  border-radius: 50%; font-size: 16px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--gray-700);
+}
+.modal-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  -webkit-overflow-scrolling: touch;
+}
+.modal-footer {
+  padding: 12px 16px;
+  border-top: 1px solid var(--gray-200);
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  flex-shrink: 0;
+  padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+}
+
+/* ===== Form ===== */
+.form-group { margin-bottom: 14px; }
+.form-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--gray-700);
+  margin-bottom: 5px;
+}
+.form-input, .form-select, .form-textarea {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1.5px solid var(--gray-300);
+  border-radius: var(--radius-sm);
+  font-size: 15px;
+  font-family: var(--font);
+  outline: none;
+  transition: border-color 0.15s;
+  background: var(--white);
+}
+.form-input:focus, .form-select:focus, .form-textarea:focus {
+  border-color: var(--primary-light);
+}
+.form-textarea { min-height: 70px; resize: vertical; }
+.form-row { display: flex; gap: 10px; }
+.form-row > .form-group { flex: 1; }
+.form-section-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--primary);
+  margin: 18px 0 10px;
+  padding-bottom: 6px;
+  border-bottom: 2px solid var(--primary-bg);
+}
+.form-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  font-size: 14px;
+}
+.toggle-switch {
+  width: 46px; height: 26px;
+  background: var(--gray-300);
+  border-radius: 13px;
+  position: relative;
+  transition: background 0.2s;
+}
+.toggle-switch.on { background: var(--success); }
+.toggle-switch::after {
+  content: '';
+  position: absolute;
+  top: 3px; left: 3px;
+  width: 20px; height: 20px;
+  background: var(--white);
+  border-radius: 50%;
+  transition: transform 0.2s;
+}
+.toggle-switch.on::after { transform: translateX(20px); }
+
+/* ===== Toast ===== */
+.toast {
+  position: fixed;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 10px 20px;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 600;
+  z-index: 300;
+  opacity: 0;
+  transition: opacity 0.25s;
+  pointer-events: none;
+  box-shadow: var(--shadow-md);
+  white-space: nowrap;
+}
+.toast.show { opacity: 1; }
+.toast-success { background: var(--success); color: var(--white); }
+.toast-error { background: var(--danger); color: var(--white); }
+
+/* ===== Settings Panel ===== */
+.settings-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.35);
+  z-index: 250;
+}
+.settings-overlay.open { display: block; }
+.settings-panel {
+  position: fixed;
+  top: 0; right: 0;
+  width: 280px;
+  max-width: 85vw;
+  height: 100vh;
+  height: 100dvh;
+  background: var(--white);
+  z-index: 251;
+  box-shadow: var(--shadow-lg);
+  padding: 20px 16px;
+  transform: translateX(100%);
+  transition: transform 0.25s ease-out;
+  overflow-y: auto;
+}
+.settings-panel.open { transform: translateX(0); }
+.settings-panel h3 {
+  font-size: 16px;
+  margin-bottom: 16px;
+  color: var(--gray-900);
+}
+.settings-panel .btn { width: 100%; margin-bottom: 8px; }
+.settings-panel .setting-hint {
+  font-size: 12px;
+  color: var(--gray-500);
+  margin: 8px 0 14px;
+  line-height: 1.5;
+}
+
+/* ===== Confirm Dialog ===== */
+.confirm-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.4);
+  z-index: 300;
+  align-items: center;
+  justify-content: center;
+}
+.confirm-overlay.open { display: flex; }
+.confirm-dialog {
+  background: var(--white);
+  border-radius: var(--radius-lg);
+  padding: 24px 20px 16px;
+  width: 300px;
+  max-width: 90vw;
+  text-align: center;
+  box-shadow: var(--shadow-lg);
+}
+.confirm-dialog p { margin-bottom: 16px; font-size: 15px; color: var(--gray-900); }
+.confirm-dialog .confirm-actions { display: flex; gap: 10px; justify-content: center; }
+
+/* ===== PWA Install Hint ===== */
+.pwa-hint {
+  display: none;
+  background: var(--accent-bg);
+  color: var(--gray-900);
+  text-align: center;
+  padding: 8px 14px;
+  font-size: 12px;
+  border-bottom: 1px solid var(--accent);
+}
+@media (display-mode: browser) {
+  .pwa-hint.phone { display: block; }
+}
+
+/* ===== Desktop tweaks ===== */
+@media (min-width: 801px) {
+  .app { border-radius: var(--radius-lg); margin: 20px auto; min-height: calc(100vh - 40px); }
+  .tabs { border-radius: 0 0 var(--radius-lg) 0; }
+  .modal {
+    border-radius: var(--radius-lg);
+    max-height: 80vh;
+    margin-bottom: 5vh;
+  }
+  .modal-overlay { align-items: center; }
+  .calendar-cell { font-size: 15px; padding: 6px 4px; }
+}
+
+/* ===== Print (hidden) ===== */
+@media print {
+  .tabs, .fab, .header { display: none; }
+  .main { padding: 0; }
+}
+
+/* ===== Transitions ===== */
+.fade-in { animation: fadeIn 0.2s ease-out; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+/* ===== Import Buttons ===== */
+.import-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.import-btn {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1.5px dashed var(--gray-300);
+  background: var(--gray-100);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--gray-700);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  transition: all 0.15s;
+  font-family: var(--font);
+}
+.import-btn:hover { border-color: var(--primary-light); color: var(--primary); background: var(--primary-bg); }
+.import-btn:active { transform: scale(0.98); }
+
+/* ===== Loading Overlay ===== */
+.loading-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.4);
+  z-index: 280;
+  align-items: center;
+  justify-content: center;
+}
+.loading-overlay.open { display: flex; }
+.loading-box {
+  background: var(--white);
+  border-radius: var(--radius-lg);
+  padding: 30px 40px;
+  text-align: center;
+  box-shadow: var(--shadow-lg);
+}
+.spinner {
+  width: 40px; height: 40px;
+  border: 3px solid var(--gray-200);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin: 0 auto 14px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-text { font-size: 14px; color: var(--gray-700); font-weight: 500; }
+
+/* ===== Recognition Badge ===== */
+.recog-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 700;
+  margin-bottom: 12px;
+}
+.recog-badge.summons { background: #fde8d0; color: #b8731f; }
+.recog-badge.contract { background: #d0e8f0; color: #1f6f8f; }
+
+/* ===== Raw text preview in review modal ===== */
+.raw-text-toggle {
+  margin-top: 12px;
+  font-size: 12px;
+  color: var(--primary);
+  cursor: pointer;
+  font-weight: 500;
+}
+.raw-text-preview {
+  display: none;
+  margin-top: 8px;
+  padding: 10px;
+  background: var(--gray-100);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  color: var(--gray-700);
+  max-height: 120px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  line-height: 1.5;
+}
+.raw-text-preview.open { display: block; }
+</style>
+</head>
+<body>
+
+<div class="app" id="app">
+  <!-- Header -->
+  <div class="header">
+    <div>
+      <div class="header-title">律师工作助手</div>
+      <div class="header-date" id="headerDate"></div>
+    </div>
+    <div class="header-actions">
+      <button class="icon-btn" onclick="openSettings()" title="设置">&#9881;</button>
+    </div>
+  </div>
+
+  <!-- PWA Install Hint -->
+  <div class="pwa-hint phone" id="pwaHint">
+    提示：在浏览器菜单中选择「添加到桌面」，使用更便捷
+    <button style="margin-left:8px;background:none;border:none;cursor:pointer;font-size:14px;" onclick="document.getElementById('pwaHint').style.display='none'">&times;</button>
+  </div>
+
+  <!-- Main Content -->
+  <div class="main" id="mainContent">
+    <!-- Tab: Calendar -->
+    <div class="tab-content active" id="tab-calendar">
+      <div class="import-row">
+        <button class="import-btn" onclick="triggerImport('summons')">📋 导入传票 (PDF)</button>
+      </div>
+      <div class="calendar-header">
+        <button class="calendar-nav" onclick="prevMonth()" style="padding:0 8px;">&#10094;</button>
+        <span class="calendar-month" id="calendarMonth"></span>
+        <button class="calendar-nav" onclick="nextMonth()" style="padding:0 8px;">&#10095;</button>
+        <button class="calendar-nav calendar-today-btn" onclick="goToday()">今天</button>
+      </div>
+      <div class="weekdays">
+        <span class="weekend">日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span class="weekend">六</span>
+      </div>
+      <div class="calendar-grid" id="calendarGrid"></div>
+      <div class="selected-date-header" id="selectedDateHeader"></div>
+      <div class="hearing-list" id="hearingList"></div>
+    </div>
+
+    <!-- Tab: Tasks -->
+    <div class="tab-content" id="tab-tasks">
+      <div class="task-input-row">
+        <input class="task-input" id="taskInput" placeholder="输入待办事项，回车添加..." onkeydown="if(event.key==='Enter')addTask()">
+        <button class="btn btn-primary" onclick="addTask()">添加</button>
+      </div>
+      <div class="task-count" id="taskCount"></div>
+      <div class="task-list" id="pendingTasks"></div>
+      <div class="tasks-done-header" id="doneHeader" onclick="toggleDone()">
+        <span class="arrow">&#9654;</span>
+        <span>已完成 (<span id="doneCount">0</span>)</span>
+      </div>
+      <div class="tasks-done" id="doneTasks"></div>
+    </div>
+
+    <!-- Tab: Cases -->
+    <div class="tab-content" id="tab-cases">
+      <div class="import-row">
+        <button class="import-btn" onclick="triggerImport('contract')">📝 导入合同 (PDF/Word)</button>
+      </div>
+      <input class="case-search" id="caseSearch" placeholder="搜索客户或项目名称..." oninput="renderCases()">
+      <div class="case-list" id="caseList"></div>
+    </div>
+  </div>
+
+  <!-- Bottom Tabs -->
+  <div class="tabs">
+    <button class="tab active" data-tab="calendar" onclick="switchTab('calendar')">
+      <span class="tab-icon">&#128197;</span>
+      <span class="tab-label">庭审日历</span>
+    </button>
+    <button class="tab" data-tab="tasks" onclick="switchTab('tasks')">
+      <span class="tab-icon">&#9989;</span>
+      <span class="tab-label">待办任务</span>
+    </button>
+    <button class="tab" data-tab="cases" onclick="switchTab('cases')">
+      <span class="tab-icon">&#128188;</span>
+      <span class="tab-label">案件管理</span>
+    </button>
+  </div>
+
+  <!-- FAB -->
+  <button class="fab" id="fab" onclick="fabClick()">+</button>
+</div>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modalOverlay" onclick="if(event.target===this)closeModal()">
+  <div class="modal" id="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="modalTitle"></span>
+      <button class="modal-close" onclick="closeModal()">&times;</button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+    <div class="modal-footer" id="modalFooter"></div>
+  </div>
+</div>
+
+<!-- Confirm Dialog -->
+<div class="confirm-overlay" id="confirmOverlay">
+  <div class="confirm-dialog">
+    <p id="confirmMsg"></p>
+    <div class="confirm-actions">
+      <button class="btn btn-outline btn-sm" onclick="confirmNo()">取消</button>
+      <button class="btn btn-danger btn-sm" id="confirmYesBtn">确认删除</button>
+    </div>
+  </div>
+</div>
+
+<!-- Settings Panel -->
+<div class="settings-overlay" id="settingsOverlay" onclick="closeSettings()"></div>
+<div class="settings-panel" id="settingsPanel">
+  <h3>设置</h3>
+  <button class="btn btn-primary btn-sm" onclick="exportData()">导出数据 (JSON)</button>
+  <button class="btn btn-outline btn-sm" onclick="document.getElementById('importFile').click()">导入数据 (JSON)</button>
+  <p class="setting-hint">
+    导入会合并数据，不会删除已有记录。<br>
+    手机和电脑之间可以通过导出/导入来同步数据。
+  </p>
+  <hr style="border:none;border-top:1px solid var(--gray-200);margin:12px 0;">
+  <h4 style="font-size:14px;margin-bottom:8px;color:var(--gray-900);">文件识别导入</h4>
+  <button class="btn btn-outline btn-sm" onclick="closeSettings();triggerImport('summons')">📋 导入传票 (PDF)</button>
+  <button class="btn btn-outline btn-sm" onclick="closeSettings();triggerImport('contract')">📝 导入合同 (PDF/Word)</button>
+  <p class="setting-hint">
+    自动识别法院传票或委托代理合同中的关键信息。<br>
+    识别结果可核对修改后再保存。扫描件PDF无法识别文字。
+  </p>
+  <hr style="border:none;border-top:1px solid var(--gray-200);margin:12px 0;">
+  <p style="font-size:12px;color:var(--gray-500);margin-bottom:4px;">存储统计</p>
+  <p style="font-size:12px;color:var(--gray-700);" id="storageStats"></p>
+  <hr style="border:none;border-top:1px solid var(--gray-200);margin:12px 0;">
+  <button class="btn btn-outline btn-sm" style="color:var(--danger);border-color:var(--danger);" onclick="clearAllData()">清空全部数据</button>
+  <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(event)">
+</div>
+
+<!-- Hidden File Input -->
+<input type="file" id="fileInput" style="display:none" onchange="handleFileSelect(event)">
+
+<!-- Loading Overlay -->
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="loading-box">
+    <div class="spinner"></div>
+    <div class="loading-text" id="loadingText">正在解析文件...</div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ===== DATA LAYER =====
+const STORAGE_KEY = 'lawyer_assistant_data';
+
+function loadData() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return { hearings: [], tasks: [], cases: [] };
+    return JSON.parse(raw);
+  } catch (e) {
+    return { hearings: [], tasks: [], cases: [] };
+  }
+}
+
+function saveData(data) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+}
+
+function getHearings() { return loadData().hearings; }
+function getTasks() { return loadData().tasks; }
+function getCases() { return loadData().cases; }
+
+function saveHearings(hearings) {
+  const data = loadData();
+  data.hearings = hearings;
+  saveData(data);
+}
+
+function saveTasks(tasks) {
+  const data = loadData();
+  data.tasks = tasks;
+  saveData(data);
+}
+
+function saveCases(cases) {
+  const data = loadData();
+  data.cases = cases;
+  saveData(data);
+}
+
+function genId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+
+// ===== APP STATE =====
+let currentTab = 'calendar';
+let calendarYear, calendarMonth;
+let selectedDate = null; // 'YYYY-MM-DD'
+
+const today = new Date();
+const todayStr = formatDate(today);
+calendarYear = today.getFullYear();
+calendarMonth = today.getMonth(); // 0-indexed
+
+// ===== HELPERS =====
+function formatDate(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function formatDateCN(d) {
+  return `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日`;
+}
+
+function showToast(msg, type) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = `toast toast-${type || 'success'} show`;
+  clearTimeout(t._timeout);
+  t._timeout = setTimeout(() => { t.className = 'toast'; }, 2000);
+}
+
+// ===== TAB SWITCHING =====
+function switchTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+
+  document.getElementById('tab-' + tab).classList.add('active');
+  document.querySelector(`.tab[data-tab="${tab}"]`).classList.add('active');
+
+  const fab = document.getElementById('fab');
+  if (tab === 'calendar') { fab.style.display = 'flex'; }
+  else if (tab === 'tasks') { fab.style.display = 'none'; }
+  else { fab.style.display = 'flex'; }
+
+  if (tab === 'calendar') renderCalendar();
+  if (tab === 'tasks') renderTasks();
+  if (tab === 'cases') renderCases();
+}
+
+function fabClick() {
+  if (currentTab === 'calendar') openHearingForm();
+  else if (currentTab === 'cases') openCaseForm();
+}
+
+// ===== MODAL =====
+let modalCallback = null;
+
+function openModal(title, bodyHTML, footerHTML, cb) {
+  document.getElementById('modalTitle').textContent = title;
+  document.getElementById('modalBody').innerHTML = bodyHTML;
+  document.getElementById('modalFooter').innerHTML = footerHTML || '';
+  document.getElementById('modalOverlay').classList.add('open');
+  modalCallback = cb || null;
+}
+
+function closeModal() {
+  document.getElementById('modalOverlay').classList.remove('open');
+  modalCallback = null;
+}
+
+// ===== CONFIRM DIALOG =====
+let confirmCallback = null;
+
+function showConfirm(msg, cb) {
+  document.getElementById('confirmMsg').textContent = msg;
+  document.getElementById('confirmOverlay').classList.add('open');
+  confirmCallback = cb;
+}
+
+function confirmNo() {
+  document.getElementById('confirmOverlay').classList.remove('open');
+  confirmCallback = null;
+}
+
+document.getElementById('confirmYesBtn').addEventListener('click', () => {
+  document.getElementById('confirmOverlay').classList.remove('open');
+  if (confirmCallback) { confirmCallback(); confirmCallback = null; }
+});
+
+// ===== SETTINGS =====
+function openSettings() {
+  document.getElementById('settingsOverlay').classList.add('open');
+  document.getElementById('settingsPanel').classList.add('open');
+  updateStorageStats();
+}
+
+function closeSettings() {
+  document.getElementById('settingsOverlay').classList.remove('open');
+  document.getElementById('settingsPanel').classList.remove('open');
+}
+
+function updateStorageStats() {
+  const data = loadData();
+  const h = data.hearings.length;
+  const t = data.tasks.length;
+  const c = data.cases.length;
+  document.getElementById('storageStats').textContent =
+    `庭审 ${h} 条 | 待办 ${t} 条 | 案件 ${c} 条`;
+}
+
+function exportData() {
+  const data = loadData();
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  const ts = new Date().toISOString().slice(0, 10);
+  a.download = `律师工作助手_备份_${ts}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('数据已导出');
+  closeSettings();
+}
+
+function importData(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const imported = JSON.parse(e.target.result);
+      if (!imported.hearings || !imported.tasks || !imported.cases) {
+        throw new Error('数据格式不正确');
+      }
+      const current = loadData();
+      // Merge: overwrite by id, add new
+      const existingHIds = new Set(current.hearings.map(h => h.id));
+      const existingTIds = new Set(current.tasks.map(t => t.id));
+      const existingCIds = new Set(current.cases.map(c => c.id));
+
+      for (const h of imported.hearings) {
+        if (existingHIds.has(h.id)) {
+          const idx = current.hearings.findIndex(x => x.id === h.id);
+          current.hearings[idx] = h;
+        } else {
+          current.hearings.push(h);
+        }
+      }
+      for (const t of imported.tasks) {
+        if (existingTIds.has(t.id)) {
+          const idx = current.tasks.findIndex(x => x.id === t.id);
+          current.tasks[idx] = t;
+        } else {
+          current.tasks.push(t);
+        }
+      }
+      for (const c of imported.cases) {
+        if (existingCIds.has(c.id)) {
+          const idx = current.cases.findIndex(x => x.id === c.id);
+          current.cases[idx] = c;
+        } else {
+          current.cases.push(c);
+        }
+      }
+      saveData(current);
+      showToast('数据已导入并合并');
+      closeSettings();
+      refreshAll();
+    } catch (err) {
+      showToast('导入失败：文件格式不正确', 'error');
+    }
+  };
+  reader.readAsText(file);
+  event.target.value = '';
+}
+
+function clearAllData() {
+  showConfirm('确定要清空全部数据吗？此操作不可恢复。', () => {
+    localStorage.removeItem(STORAGE_KEY);
+    selectedDate = null;
+    showToast('所有数据已清空');
+    closeSettings();
+    refreshAll();
+  });
+}
+
+// ===== CALENDAR =====
+function prevMonth() {
+  if (calendarMonth === 0) { calendarMonth = 11; calendarYear--; }
+  else { calendarMonth--; }
+  renderCalendar();
+}
+
+function nextMonth() {
+  if (calendarMonth === 11) { calendarMonth = 0; calendarYear++; }
+  else { calendarMonth++; }
+  renderCalendar();
+}
+
+function goToday() {
+  calendarYear = today.getFullYear();
+  calendarMonth = today.getMonth();
+  selectedDate = todayStr;
+  renderCalendar();
+}
+
+function renderCalendar() {
+  document.getElementById('calendarMonth').textContent = `${calendarYear}年 ${calendarMonth + 1}月`;
+
+  const hearings = getHearings();
+  // Map date -> count of hearings
+  const hearingMap = {};
+  for (const h of hearings) {
+    if (!hearingMap[h.hearingDate]) hearingMap[h.hearingDate] = [];
+    hearingMap[h.hearingDate].push(h);
+  }
+
+  const firstDay = new Date(calendarYear, calendarMonth, 1).getDay(); // 0=Sun
+  const daysInMonth = new Date(calendarYear, calendarMonth + 1, 0).getDate();
+  const daysInPrevMonth = new Date(calendarYear, calendarMonth, 0).getDate();
+
+  let html = '';
+  // Previous month fill
+  for (let i = firstDay - 1; i >= 0; i--) {
+    const d = daysInPrevMonth - i;
+    html += `<div class="calendar-cell other-month">${d}</div>`;
+  }
+  // Current month
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${calendarYear}-${String(calendarMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    let cls = 'calendar-cell';
+    if (dateStr === todayStr) cls += ' today';
+    if (dateStr === selectedDate) cls += ' selected';
+    const hasHearing = hearingMap[dateStr] && hearingMap[dateStr].length > 0;
+    const dotHTML = hasHearing ? `<div class="dot"></div>` : '';
+    html += `<div class="${cls}" data-date="${dateStr}" onclick="selectDate('${dateStr}', event)">${d}${dotHTML}</div>`;
+  }
+  // Next month fill
+  const totalCells = firstDay + daysInMonth;
+  const remaining = totalCells <= 35 ? 35 - totalCells : 42 - totalCells;
+  for (let d = 1; d <= remaining; d++) {
+    html += `<div class="calendar-cell other-month">${d}</div>`;
+  }
+
+  document.getElementById('calendarGrid').innerHTML = html;
+
+  // Render selected date hearings
+  renderSelectedDate(hearings);
+}
+
+function selectDate(dateStr, event) {
+  if (event) event.stopPropagation();
+  selectedDate = dateStr;
+  renderCalendar();
+}
+
+function renderSelectedDate(hearings) {
+  const headerEl = document.getElementById('selectedDateHeader');
+  const listEl = document.getElementById('hearingList');
+
+  if (!selectedDate) {
+    headerEl.style.display = 'none';
+    listEl.innerHTML = '';
+    return;
+  }
+
+  const parts = selectedDate.split('-');
+  headerEl.style.display = 'block';
+  const wd = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2])).getDay();
+  const wdNames = ['日', '一', '二', '三', '四', '五', '六'];
+  headerEl.textContent = `${parseInt(parts[1])}月${parseInt(parts[2])}日 星期${wdNames[wd]} 的庭审`;
+
+  if (!hearings) hearings = getHearings();
+  const dayHearings = hearings.filter(h => h.hearingDate === selectedDate);
+
+  if (dayHearings.length === 0) {
+    listEl.innerHTML = '<div class="no-data">当天无庭审安排</div>';
+    return;
+  }
+
+  dayHearings.sort((a, b) => a.hearingTime.localeCompare(b.hearingTime));
+  listEl.innerHTML = dayHearings.map(h => `
+    <div class="hearing-card" onclick="openHearingForm('${h.id}')">
+      <div class="hc-top">
+        <span class="hc-name">${escHtml(h.caseName || '未命名案件')}</span>
+        <span class="hc-time">${h.hearingTime || '--:--'}</span>
+      </div>
+      <div class="hc-info">
+        ${h.courtName ? `<span>&#127963; ${escHtml(h.courtName)}</span>` : ''}
+        ${h.location ? `<span>&#128205; ${escHtml(h.location)}</span>` : ''}
+      </div>
+      ${h.caseNumber ? `<div class="hc-info" style="margin-top:2px;font-size:12px;color:var(--gray-500);">案号: ${escHtml(h.caseNumber)}</div>` : ''}
+    </div>
+  `).join('');
+}
+
+// ===== HEARING FORM =====
+function openHearingForm(id) {
+  const hearings = getHearings();
+  const h = id ? hearings.find(x => x.id === id) : null;
+  const isEdit = !!h;
+  const title = isEdit ? '编辑庭审' : '新增庭审';
+  const dateVal = h ? h.hearingDate : (selectedDate || todayStr);
+
+  const bodyHTML = `
+    <div class="form-group">
+      <label class="form-label">案件名称 <span style="color:var(--danger);">*</span></label>
+      <input class="form-input" id="hf-caseName" value="${escAttr(h ? h.caseName : '')}" placeholder="如：张三诉李四合同纠纷">
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">案号</label>
+        <input class="form-input" id="hf-caseNumber" value="${escAttr(h ? h.caseNumber : '')}" placeholder="(2026)X民初XX号">
+      </div>
+      <div class="form-group">
+        <label class="form-label">法院名称</label>
+        <input class="form-input" id="hf-courtName" value="${escAttr(h ? h.courtName : '')}" placeholder="XX区人民法院">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">开庭日期 <span style="color:var(--danger);">*</span></label>
+        <input class="form-input" type="date" id="hf-hearingDate" value="${dateVal}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">开庭时间</label>
+        <input class="form-input" type="time" id="hf-hearingTime" value="${h ? h.hearingTime : '09:00'}">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">地点/法庭</label>
+        <input class="form-input" id="hf-location" value="${escAttr(h ? h.location : '')}" placeholder="第X法庭">
+      </div>
+      <div class="form-group">
+        <label class="form-label">法官</label>
+        <input class="form-input" id="hf-judge" value="${escAttr(h ? h.judge : '')}" placeholder="法官姓名">
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">备注</label>
+      <textarea class="form-textarea" id="hf-notes" placeholder="其他需要记录的信息...">${escHtml(h ? h.notes : '')}</textarea>
+    </div>
+  `;
+
+  const footerHTML = `
+    ${isEdit ? `<button class="btn btn-danger btn-sm" onclick="deleteHearing('${id}')">删除</button>` : ''}
+    <div style="flex:1;"></div>
+    <button class="btn btn-outline btn-sm" onclick="closeModal()">取消</button>
+    <button class="btn btn-primary btn-sm" onclick="saveHearing('${isEdit ? id : ''}')">保存</button>
+  `;
+
+  openModal(title, bodyHTML, footerHTML);
+}
+
+function saveHearing(id) {
+  const caseName = document.getElementById('hf-caseName').value.trim();
+  const hearingDate = document.getElementById('hf-hearingDate').value;
+  if (!caseName || !hearingDate) {
+    showToast('请填写案件名称和开庭日期', 'error');
+    return;
+  }
+
+  const hearings = getHearings();
+  const obj = {
+    id: id || genId(),
+    caseName,
+    caseNumber: document.getElementById('hf-caseNumber').value.trim(),
+    courtName: document.getElementById('hf-courtName').value.trim(),
+    hearingDate,
+    hearingTime: document.getElementById('hf-hearingTime').value,
+    location: document.getElementById('hf-location').value.trim(),
+    judge: document.getElementById('hf-judge').value.trim(),
+    notes: document.getElementById('hf-notes').value.trim()
+  };
+
+  if (id) {
+    const idx = hearings.findIndex(h => h.id === id);
+    if (idx >= 0) hearings[idx] = obj;
+  } else {
+    hearings.push(obj);
+  }
+
+  saveHearings(hearings);
+  closeModal();
+  // Auto select the hearing's date
+  selectedDate = hearingDate;
+  calendarYear = parseInt(hearingDate.split('-')[0]);
+  calendarMonth = parseInt(hearingDate.split('-')[1]) - 1;
+  renderCalendar();
+  updateStorageStats();
+  showToast(id ? '庭审已更新' : '庭审已添加');
+}
+
+function deleteHearing(id) {
+  closeModal();
+  showConfirm('确定删除这条庭审记录吗？', () => {
+    const hearings = getHearings().filter(h => h.id !== id);
+    saveHearings(hearings);
+    renderCalendar();
+    updateStorageStats();
+    showToast('庭审已删除');
+  });
+}
+
+// ===== TASKS =====
+function renderTasks() {
+  const tasks = getTasks();
+  const pending = tasks.filter(t => !t.completed);
+  const done = tasks.filter(t => t.completed);
+
+  document.getElementById('taskCount').textContent =
+    pending.length === 0 ? '暂无待办事项' : `${pending.length} 项待完成`;
+
+  document.getElementById('pendingTasks').innerHTML = pending.length === 0
+    ? '<div class="no-data" style="padding:30px;">暂无待办，上方输入添加</div>'
+    : pending.map(t => `
+      <div class="task-item" id="task-${t.id}">
+        <div class="task-check" onclick="toggleTask('${t.id}')">&#10003;</div>
+        <span class="task-title">${escHtml(t.title)}</span>
+        <button class="task-delete" onclick="deleteTask('${t.id}')" title="删除">&times;</button>
+      </div>
+    `).join('');
+
+  document.getElementById('doneCount').textContent = done.length;
+  document.getElementById('doneTasks').innerHTML = done.map(t => `
+    <div class="task-item completed">
+      <div class="task-check" onclick="toggleTask('${t.id}')">&#10003;</div>
+      <span class="task-title">${escHtml(t.title)}</span>
+      <button class="task-delete" onclick="deleteTask('${t.id}')" title="删除">&times;</button>
+    </div>
+  `).join('');
+
+  const doneSection = document.getElementById('doneTasks');
+  const doneHeader = document.getElementById('doneHeader');
+  if (doneSection.classList.contains('open')) {
+    doneHeader.classList.add('open');
+  } else {
+    doneHeader.classList.remove('open');
+  }
+}
+
+function addTask() {
+  const input = document.getElementById('taskInput');
+  const title = input.value.trim();
+  if (!title) return;
+
+  const tasks = getTasks();
+  tasks.unshift({
+    id: genId(),
+    title,
+    completed: false,
+    createdAt: new Date().toISOString(),
+    completedAt: null
+  });
+  saveTasks(tasks);
+  input.value = '';
+  renderTasks();
+  updateStorageStats();
+  input.focus();
+}
+
+function toggleTask(id) {
+  const tasks = getTasks();
+  const t = tasks.find(x => x.id === id);
+  if (!t) return;
+  t.completed = !t.completed;
+  t.completedAt = t.completed ? new Date().toISOString() : null;
+  saveTasks(tasks);
+  renderTasks();
+}
+
+function deleteTask(id) {
+  showConfirm('确定删除这条任务吗？', () => {
+    const tasks = getTasks().filter(t => t.id !== id);
+    saveTasks(tasks);
+    renderTasks();
+    updateStorageStats();
+    showToast('任务已删除');
+  });
+}
+
+function toggleDone() {
+  const section = document.getElementById('doneTasks');
+  const header = document.getElementById('doneHeader');
+  section.classList.toggle('open');
+  header.classList.toggle('open');
+}
+
+// ===== CASES =====
+function renderCases() {
+  const cases = getCases();
+  const search = (document.getElementById('caseSearch').value || '').trim().toLowerCase();
+  let filtered = cases;
+  if (search) {
+    filtered = cases.filter(c =>
+      (c.clientName || '').toLowerCase().includes(search) ||
+      (c.projectName || '').toLowerCase().includes(search)
+    );
+  }
+
+  if (filtered.length === 0) {
+    document.getElementById('caseList').innerHTML =
+      '<div class="no-data">' + (search ? '未找到匹配的案件' : '暂无案件，点击右下角 + 添加') + '</div>';
+    return;
+  }
+
+  document.getElementById('caseList').innerHTML = filtered.map(c => `
+    <div class="case-card" onclick="openCaseForm('${c.id}')">
+      <div class="cc-header">
+        <div>
+          <div class="cc-client">${escHtml(c.clientName || '未填写客户')}</div>
+          <div class="cc-project">${escHtml(c.projectName || '')}</div>
+        </div>
+        ${c.contractSigned ? '<span class="badge badge-green">合同已签</span>' : '<span class="badge badge-gray">合同未签</span>'}
+      </div>
+      <div class="cc-badges">
+        ${statusBadge('支付', c.feePaymentStatus)}
+        ${statusBadge('开票', c.invoicingStatus)}
+        ${statusBadge('归档', c.archivingStatus)}
+      </div>
+      ${c.projectProgress ? `<div class="cc-progress">${escHtml(c.projectProgress.length > 80 ? c.projectProgress.substring(0, 80) + '...' : c.projectProgress)}</div>` : ''}
+    </div>
+  `).join('');
+}
+
+function statusBadge(label, value) {
+  if (!value || value === '未付' || value === '未开票' || value === '未归档') {
+    return `<span class="badge badge-gray">${label}: ${value || '未填写'}</span>`;
+  }
+  if (value === '已付清' || value === '已开票' || value === '已归档') {
+    return `<span class="badge badge-green">${label}: ${value}</span>`;
+  }
+  if (value === '部分支付') {
+    return `<span class="badge badge-orange">${label}: ${value}</span>`;
+  }
+  return `<span class="badge badge-blue">${label}: ${value}</span>`;
+}
+
+function openCaseForm(id) {
+  const cases = getCases();
+  const c = id ? cases.find(x => x.id === id) : null;
+  const isEdit = !!c;
+  const title = isEdit ? '编辑案件' : '新增案件';
+
+  const bodyHTML = `
+    <div class="form-section-title">基本信息</div>
+    <div class="form-group">
+      <label class="form-label">客户名称 <span style="color:var(--danger);">*</span></label>
+      <input class="form-input" id="cf-clientName" value="${escAttr(c ? c.clientName : '')}" placeholder="如：XX科技有限公司">
+    </div>
+    <div class="form-group">
+      <label class="form-label">项目/案件名称</label>
+      <input class="form-input" id="cf-projectName" value="${escAttr(c ? c.projectName : '')}" placeholder="如：2026年度法律顾问">
+    </div>
+
+    <div class="form-section-title">合同信息</div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">合同签署</label>
+        <div class="form-toggle" onclick="toggleSwitch(this)">
+          <div class="toggle-switch${c && c.contractSigned ? ' on' : ''}" id="cf-contractSigned"></div>
+          <span>${c && c.contractSigned ? '已签署' : '未签署'}</span>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">签订日期</label>
+        <input class="form-input" type="date" id="cf-contractDate" value="${c ? c.contractDate : ''}">
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">费用约定</label>
+      <textarea class="form-textarea" id="cf-feeArrangement" placeholder="如：固定费用XX元 / 风险代理XX% / 按时计费...">${escHtml(c ? c.feeArrangement : '')}</textarea>
+    </div>
+    <div class="form-group">
+      <label class="form-label">支付条件</label>
+      <textarea class="form-textarea" id="cf-paymentTerms" placeholder="如：签订后付50%，结案后付50%...">${escHtml(c ? c.paymentTerms : '')}</textarea>
+    </div>
+
+    <div class="form-section-title">费用与结算</div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">费用支付情况</label>
+        <select class="form-select" id="cf-feePaymentStatus">
+          <option value="未付" ${c && c.feePaymentStatus === '未付' ? 'selected' : ''}>未付</option>
+          <option value="部分支付" ${c && c.feePaymentStatus === '部分支付' ? 'selected' : ''}>部分支付</option>
+          <option value="已付清" ${c && c.feePaymentStatus === '已付清' ? 'selected' : ''}>已付清</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">开票情况</label>
+        <select class="form-select" id="cf-invoicingStatus">
+          <option value="未开票" ${c && c.invoicingStatus === '未开票' ? 'selected' : ''}>未开票</option>
+          <option value="已开票" ${c && c.invoicingStatus === '已开票' ? 'selected' : ''}>已开票</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="form-section-title">归档与进展</div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">归档情况</label>
+        <select class="form-select" id="cf-archivingStatus">
+          <option value="未归档" ${c && c.archivingStatus === '未归档' ? 'selected' : ''}>未归档</option>
+          <option value="已归档" ${c && c.archivingStatus === '已归档' ? 'selected' : ''}>已归档</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">项目进展</label>
+      <textarea class="form-textarea" id="cf-projectProgress" placeholder="当前案件进展情况...">${escHtml(c ? c.projectProgress : '')}</textarea>
+    </div>
+    <div class="form-group">
+      <label class="form-label">备注</label>
+      <textarea class="form-textarea" id="cf-notes" placeholder="其他备注信息...">${escHtml(c ? c.notes : '')}</textarea>
+    </div>
+  `;
+
+  const footerHTML = `
+    ${isEdit ? `<button class="btn btn-danger btn-sm" onclick="deleteCase('${id}')">删除</button>` : ''}
+    <div style="flex:1;"></div>
+    <button class="btn btn-outline btn-sm" onclick="closeModal()">取消</button>
+    <button class="btn btn-primary btn-sm" onclick="saveCase('${isEdit ? id : ''}')">保存</button>
+  `;
+
+  openModal(title, bodyHTML, footerHTML);
+}
+
+function toggleSwitch(el) {
+  const sw = el.querySelector('.toggle-switch');
+  const label = el.querySelector('span');
+  const isOn = sw.classList.contains('on');
+  if (isOn) {
+    sw.classList.remove('on');
+    label.textContent = '未签署';
+  } else {
+    sw.classList.add('on');
+    label.textContent = '已签署';
+  }
+}
+
+function saveCase(id) {
+  const clientName = document.getElementById('cf-clientName').value.trim();
+  if (!clientName) {
+    showToast('请填写客户名称', 'error');
+    return;
+  }
+
+  const contractSignedEl = document.getElementById('cf-contractSigned');
+
+  const cases = getCases();
+  const obj = {
+    id: id || genId(),
+    clientName,
+    projectName: document.getElementById('cf-projectName').value.trim(),
+    contractSigned: contractSignedEl.classList.contains('on'),
+    contractDate: document.getElementById('cf-contractDate').value,
+    feeArrangement: document.getElementById('cf-feeArrangement').value.trim(),
+    paymentTerms: document.getElementById('cf-paymentTerms').value.trim(),
+    feePaymentStatus: document.getElementById('cf-feePaymentStatus').value,
+    invoicingStatus: document.getElementById('cf-invoicingStatus').value,
+    archivingStatus: document.getElementById('cf-archivingStatus').value,
+    projectProgress: document.getElementById('cf-projectProgress').value.trim(),
+    notes: document.getElementById('cf-notes').value.trim()
+  };
+
+  if (id) {
+    const idx = cases.findIndex(c => c.id === id);
+    if (idx >= 0) cases[idx] = obj;
+  } else {
+    cases.push(obj);
+  }
+
+  saveCases(cases);
+  closeModal();
+  renderCases();
+  updateStorageStats();
+  showToast(id ? '案件已更新' : '案件已添加');
+}
+
+function deleteCase(id) {
+  closeModal();
+  showConfirm('确定删除这个案件吗？', () => {
+    const cases = getCases().filter(c => c.id !== id);
+    saveCases(cases);
+    renderCases();
+    updateStorageStats();
+    showToast('案件已删除');
+  });
+}
+
+// ===== FILE RECOGNITION =====
+let pdfjsLoaded = false;
+let mammothLoaded = false;
+let pendingImportType = null; // 'summons' or 'contract'
+
+function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    if (document.querySelector(`script[src="${src}"]`)) return resolve();
+    const s = document.createElement('script');
+    s.src = src;
+    s.onload = resolve;
+    s.onerror = () => reject(new Error('脚本加载失败: ' + src));
+    document.head.appendChild(s);
+  });
+}
+
+async function ensurePDFJS() {
+  if (pdfjsLoaded && typeof pdfjsLib !== 'undefined') return;
+  document.getElementById('loadingText').textContent = '正在加载PDF解析引擎...';
+  await loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js');
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  pdfjsLoaded = true;
+}
+
+async function ensureMammoth() {
+  if (mammothLoaded && typeof mammoth !== 'undefined') return;
+  document.getElementById('loadingText').textContent = '正在加载Word解析引擎...';
+  await loadScript('https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js');
+  mammothLoaded = true;
+}
+
+async function extractPDFText(file) {
+  const arrayBuffer = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+  let fullText = '';
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    const pageText = content.items.map(item => item.str).join(' ');
+    fullText += pageText + '\n';
+  }
+  return fullText.trim();
+}
+
+async function extractDocxText(file) {
+  const arrayBuffer = await file.arrayBuffer();
+  const result = await mammoth.extractRawText({ arrayBuffer });
+  return result.value.trim();
+}
+
+function classifyDocument(text) {
+  const summonsKw = ['传票', '开庭', '应诉', '出庭', '审理', '法庭', '开庭审理', '传唤'];
+  const contractKw = ['委托代理', '委托合同', '代理费', '甲方', '乙方', '律师事务所', '授权委托', '代理权限'];
+
+  let ss = 0, cs = 0;
+  for (const kw of summonsKw) { if (text.includes(kw)) ss++; }
+  for (const kw of contractKw) { if (text.includes(kw)) cs++; }
+
+  if (ss > cs) return 'summons';
+  if (cs > ss) return 'contract';
+  return 'unknown';
+}
+
+function extractSummonsFields(text) {
+  const f = {};
+
+  // Case number: (2026)京0105民初12345号 or （2026）京0105民初12345号
+  let m = text.match(/[（(](\d{4})[）)]([一-龥]+\d+号)/);
+  if (!m) m = text.match(/(\d{4})年?[一-龥]+第?(\d+号)/);
+  if (m) f.caseNumber = m[0].replace(/[（(]/, '(').replace(/[）)]/, ')');
+
+  // Court name
+  m = text.match(/([一-龥]{2,}(?:市|县|区)?(?:中级|高级)?人民法院)/);
+  if (m) f.courtName = m[1];
+
+  // Hearing date: 2026年5月28日 or 二〇二六年五月二十八日
+  m = text.match(/(\d{4})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日/);
+  if (!m) m = text.match(/[二〇○零一二三四五六七八九]{4,6}年[一二三四五六七八九十]{1,3}月[一二三四五六七八九十]{1,3}日/);
+  if (m && m.length >= 4) {
+    // Arabic numeral match
+    f.hearingDate = `${m[1]}-${String(parseInt(m[2])).padStart(2, '0')}-${String(parseInt(m[3])).padStart(2, '0')}`;
+  }
+
+  // Hearing time
+  m = text.match(/(上午|下午)?\s*(\d{1,2})[时:：](\d{2})\s*分?/);
+  if (m) {
+    let hour = parseInt(m[2]);
+    if (m[1] === '下午' && hour < 12) hour += 12;
+    if (m[1] === '上午' && hour === 12) hour = 0;
+    f.hearingTime = `${String(hour).padStart(2, '0')}:${m[3]}`;
+  }
+
+  // Location
+  m = text.match(/(?:开庭)?地点[：:]\s*(.+?)(?:$|\n|。|，|联系)/);
+  if (!m) m = text.match(/第[一二三四五六七八九十\d]+法庭/);
+  if (m) f.location = m[1] || m[0];
+
+  // Judge
+  m = text.match(/(?:审判员|审判长|法官|承办人|书记员)[：:]\s*(.+?)(?:$|\n|。|，|书记员)/);
+  if (!m) m = text.match(/(?:审判员|审判长|法官|承办人)[：: ]*([^\n。，]{2,4})/);
+  if (m) f.judge = (m[1] || m[0]).trim();
+
+  // Case name: extract parties
+  m = text.match(/(?:原告|申请人|自诉人)[：: ]*([^\n。，]{2,})(?:被告|被申请人|被自诉人)[：: ]*([^\n。，]{2,})/);
+  if (!m) m = text.match(/([^\n。，]{2,})(?:诉|与)([^\n。，]{2,})(?:纠纷|争议|一案)/);
+  if (m) f.caseName = m[1].trim() + '诉' + m[2].trim();
+
+  // Case cause
+  m = text.match(/案由[：:]\s*(.+?)(?:$|\n|。)/);
+  if (m && !f.caseName) f.caseName = m[1].trim();
+
+  return f;
+}
+
+function extractContractFields(text) {
+  const f = {};
+
+  // Client
+  let m = text.match(/(?:甲\s*方|委托人|委托方|聘请方)[：:]\s*(.+?)(?:$|\n|。|，|地址|法定)/);
+  if (!m) m = text.match(/(?:甲方|委托人)[：: ]*([^\n]{2,30}?)(?:地址|电话|$)/);
+  if (m) f.clientName = m[1].trim().replace(/[，,。]$/, '');
+
+  // Project name or counterparty
+  m = text.match(/(?:乙\s*方|受托人|受托方|受聘方|律师事务所)[：:]\s*(.+?)(?:$|\n|。|，|地址)/);
+  if (!m) m = text.match(/(?:乙方|律师事务所)[：: ]*([^\n]{2,30}?)(?:地址|电话|$)/);
+  if (m) f.projectName = m[1].trim().replace(/[，,。]$/, '');
+
+  // Fee
+  m = text.match(/(?:代理费|律师费|法律服务费|律师代理费|总费用)[：:]\s*(.+?)(?:$|\n|。)/);
+  if (!m) m = text.match(/(?:律师费|代理费)[：: ]*([^\n。]{1,50}?)(?:。|\n|$)/);
+  if (!m) m = text.match(/(?:¥|￥|人民币)\s*([\d,，.]+)\s*元?/);
+  if (m) {
+    f.feeArrangement = m[1] ? m[1].trim() : m[0].trim();
+  }
+
+  // Payment terms
+  m = text.match(/(?:支付方式|付款方式|支付期限|付款期限)[：:]\s*(.+?)(?:$|\n|。)/);
+  if (!m) m = text.match(/(?:分[期批]支付|一次性支付|按阶段支付)([^。]{0,30})/);
+  if (m) f.paymentTerms = m[1] ? m[1].trim() : m[0].trim();
+
+  // Contract date
+  m = text.match(/(\d{4})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日/);
+  if (m) {
+    f.contractDate = `${m[1]}-${String(parseInt(m[2])).padStart(2, '0')}-${String(parseInt(m[3])).padStart(2, '0')}`;
+    f.contractSigned = true;
+  }
+
+  // Project description
+  m = text.match(/(?:委托事项|代理事项|服务内容|工作范围)[：:]\s*(.+?)(?:$|\n|。|二[、\s]|三[、\s]|第二)/);
+  if (!m) m = text.match(/接受(.{2,20}?)的委托/);
+  if (m) f.projectProgress = m[1] ? m[1].trim() : '';
+
+  return f;
+}
+
+function triggerImport(type) {
+  pendingImportType = type;
+  const input = document.getElementById('fileInput');
+  if (type === 'summons') {
+    input.accept = '.pdf';
+  } else {
+    input.accept = '.pdf,.docx';
+  }
+  input.click();
+}
+
+async function handleFileSelect(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  event.target.value = '';
+
+  const type = pendingImportType;
+  const isPDF = file.name.toLowerCase().endsWith('.pdf');
+  const isDocx = file.name.toLowerCase().endsWith('.docx');
+
+  if (!isPDF && !isDocx) {
+    showToast('不支持的文件格式，请选择 PDF 或 Word 文件', 'error');
+    return;
+  }
+
+  // Show loading
+  document.getElementById('loadingOverlay').classList.add('open');
+  document.getElementById('loadingText').textContent = '正在解析文件...';
+
+  try {
+    let text = '';
+
+    if (isPDF) {
+      await ensurePDFJS();
+      document.getElementById('loadingText').textContent = '正在提取PDF文本...';
+      text = await extractPDFText(file);
+    } else if (isDocx) {
+      await ensureMammoth();
+      document.getElementById('loadingText').textContent = '正在提取Word文本...';
+      text = await extractDocxText(file);
+    }
+
+    document.getElementById('loadingOverlay').classList.remove('open');
+
+    if (!text || text.length < 10) {
+      showToast('未能提取到文字内容。此文件可能为扫描件（图片格式PDF），无法识别。', 'error');
+      return;
+    }
+
+    // Auto-detect or use specified type
+    const detectedType = classifyDocument(text);
+    let docType = type;
+    if (detectedType !== 'unknown' && detectedType !== type) {
+      // Document type doesn't match what user selected - still use what we detected
+      // but show the result
+    }
+    // Use the detected type if it's confident, otherwise use user's selection
+    if (detectedType !== 'unknown') {
+      docType = detectedType;
+    }
+
+    // Extract fields
+    let fields = {};
+    if (docType === 'summons') {
+      fields = extractSummonsFields(text);
+    } else {
+      fields = extractContractFields(text);
+    }
+
+    // Show review modal
+    showRecognitionReview(docType, fields, text);
+
+  } catch (err) {
+    document.getElementById('loadingOverlay').classList.remove('open');
+    console.error('File parsing error:', err);
+    if (err.message && err.message.includes('脚本加载失败')) {
+      showToast('解析引擎加载失败，请检查网络连接后重试', 'error');
+    } else if (err.message && err.message.includes('密码')) {
+      showToast('此PDF文件已加密，无法解析', 'error');
+    } else {
+      showToast('文件解析失败：' + (err.message || '文件格式不支持或已损坏'), 'error');
+    }
+  }
+}
+
+function showRecognitionReview(docType, fields, rawText) {
+  const isSummons = docType === 'summons';
+  const badgeHTML = isSummons
+    ? '<div class="recog-badge summons">📋 识别为：法院传票</div>'
+    : '<div class="recog-badge contract">📝 识别为：委托代理合同</div>';
+
+  let bodyHTML = badgeHTML;
+
+  if (isSummons) {
+    bodyHTML += `
+      <div class="form-group">
+        <label class="form-label">案件名称 <span style="color:var(--danger);">*</span></label>
+        <input class="form-input" id="rf-caseName" value="${escAttr(fields.caseName || '')}" placeholder="自动识别失败，请手动填写">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">案号</label>
+          <input class="form-input" id="rf-caseNumber" value="${escAttr(fields.caseNumber || '')}">
+        </div>
+        <div class="form-group">
+          <label class="form-label">法院名称</label>
+          <input class="form-input" id="rf-courtName" value="${escAttr(fields.courtName || '')}">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">开庭日期 <span style="color:var(--danger);">*</span></label>
+          <input class="form-input" type="date" id="rf-hearingDate" value="${fields.hearingDate || ''}">
+        </div>
+        <div class="form-group">
+          <label class="form-label">开庭时间</label>
+          <input class="form-input" type="time" id="rf-hearingTime" value="${fields.hearingTime || '09:00'}">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">地点/法庭</label>
+          <input class="form-input" id="rf-location" value="${escAttr(fields.location || '')}">
+        </div>
+        <div class="form-group">
+          <label class="form-label">法官</label>
+          <input class="form-input" id="rf-judge" value="${escAttr(fields.judge || '')}">
+        </div>
+      </div>
+    `;
+  } else {
+    bodyHTML += `
+      <div class="form-section-title">基本信息</div>
+      <div class="form-group">
+        <label class="form-label">客户名称 <span style="color:var(--danger);">*</span></label>
+        <input class="form-input" id="rf-clientName" value="${escAttr(fields.clientName || '')}" placeholder="自动识别失败，请手动填写">
+      </div>
+      <div class="form-group">
+        <label class="form-label">项目/案件名称</label>
+        <input class="form-input" id="rf-projectName" value="${escAttr(fields.projectName || '')}">
+      </div>
+      <div class="form-section-title">合同信息</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">合同签署</label>
+          <div class="form-toggle" onclick="toggleSwitch(this)">
+            <div class="toggle-switch${fields.contractSigned ? ' on' : ''}" id="rf-contractSigned"></div>
+            <span>${fields.contractSigned ? '已签署' : '未签署'}</span>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">签订日期</label>
+          <input class="form-input" type="date" id="rf-contractDate" value="${fields.contractDate || ''}">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">费用约定</label>
+        <textarea class="form-textarea" id="rf-feeArrangement">${escHtml(fields.feeArrangement || '')}</textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">支付条件</label>
+        <textarea class="form-textarea" id="rf-paymentTerms">${escHtml(fields.paymentTerms || '')}</textarea>
+      </div>
+      <div class="form-section-title">其他</div>
+      <div class="form-group">
+        <label class="form-label">项目进展</label>
+        <textarea class="form-textarea" id="rf-projectProgress">${escHtml(fields.projectProgress || '')}</textarea>
+      </div>
+    `;
+  }
+
+  // Raw text toggle for manual reference
+  bodyHTML += `
+    <div class="raw-text-toggle" onclick="toggleRawText()">📄 查看原始文本（可手动参考补充）</div>
+    <div class="raw-text-preview" id="rawTextPreview">${escHtml(rawText.length > 2000 ? rawText.substring(0, 2000) + '\n\n... (文本过长，已截断)' : rawText)}</div>
+  `;
+
+  const footerHTML = `
+    <button class="btn btn-outline btn-sm" onclick="closeModal()">取消</button>
+    <button class="btn btn-primary btn-sm" onclick="confirmRecognitionImport('${docType}')">确认导入</button>
+  `;
+
+  openModal(isSummons ? '导入传票 - 请核对信息' : '导入合同 - 请核对信息', bodyHTML, footerHTML);
+}
+
+function toggleRawText() {
+  document.getElementById('rawTextPreview').classList.toggle('open');
+}
+
+function confirmRecognitionImport(docType) {
+  if (docType === 'summons') {
+    const caseName = document.getElementById('rf-caseName').value.trim();
+    const hearingDate = document.getElementById('rf-hearingDate').value;
+    if (!caseName || !hearingDate) {
+      showToast('请至少填写案件名称和开庭日期', 'error');
+      return;
+    }
+    const hearings = getHearings();
+    hearings.push({
+      id: genId(),
+      caseName,
+      caseNumber: document.getElementById('rf-caseNumber').value.trim(),
+      courtName: document.getElementById('rf-courtName').value.trim(),
+      hearingDate,
+      hearingTime: document.getElementById('rf-hearingTime').value,
+      location: document.getElementById('rf-location').value.trim(),
+      judge: document.getElementById('rf-judge').value.trim(),
+      notes: '【文件识别导入】'
+    });
+    saveHearings(hearings);
+    closeModal();
+    selectedDate = hearingDate;
+    calendarYear = parseInt(hearingDate.split('-')[0]);
+    calendarMonth = parseInt(hearingDate.split('-')[1]) - 1;
+    switchTab('calendar');
+    updateStorageStats();
+    showToast('传票信息已导入庭审日历');
+  } else {
+    const clientName = document.getElementById('rf-clientName').value.trim();
+    if (!clientName) {
+      showToast('请至少填写客户名称', 'error');
+      return;
+    }
+    const contractSignedEl = document.getElementById('rf-contractSigned');
+    const cases = getCases();
+    cases.push({
+      id: genId(),
+      clientName,
+      projectName: document.getElementById('rf-projectName').value.trim(),
+      contractSigned: contractSignedEl.classList.contains('on'),
+      contractDate: document.getElementById('rf-contractDate').value,
+      feeArrangement: document.getElementById('rf-feeArrangement').value.trim(),
+      paymentTerms: document.getElementById('rf-paymentTerms').value.trim(),
+      feePaymentStatus: '未付',
+      invoicingStatus: '未开票',
+      archivingStatus: '未归档',
+      projectProgress: document.getElementById('rf-projectProgress').value.trim(),
+      notes: '【文件识别导入】'
+    });
+    saveCases(cases);
+    closeModal();
+    switchTab('cases');
+    updateStorageStats();
+    showToast('合同信息已导入案件管理');
+  }
+}
+
+// ===== HTML ESCAPE =====
+function escHtml(str) {
+  if (!str) return '';
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function escAttr(str) {
+  if (!str) return '';
+  return str.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// ===== HEADER DATE =====
+function updateHeaderDate() {
+  const now = new Date();
+  const wd = ['日','一','二','三','四','五','六'];
+  document.getElementById('headerDate').textContent =
+    `${now.getFullYear()}年${now.getMonth()+1}月${now.getDate()}日 星期${wd[now.getDay()]}`;
+}
+
+// ===== REFRESH ALL =====
+function refreshAll() {
+  if (currentTab === 'calendar') renderCalendar();
+  else if (currentTab === 'tasks') renderTasks();
+  else renderCases();
+}
+
+// ===== INIT =====
+function init() {
+  updateHeaderDate();
+  setInterval(updateHeaderDate, 60000);
+  renderCalendar();
+  updateStorageStats();
+
+  // Register Service Worker (PWA)
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  }
+
+  // Check for shared file (from share target)
+  if (window.location.search.includes('shared=1')) {
+    setTimeout(() => processSharedFile(), 500);
+  }
+
+  // Detect if phone (simple user-agent check)
+  const isPhone = /Android|iPhone|iPad|iPod|HarmonyOS/i.test(navigator.userAgent);
+  if (isPhone) {
+    document.getElementById('pwaHint').style.display = 'block';
+  }
+
+  // Keyboard shortcut: Esc to close modal
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      if (document.getElementById('modalOverlay').classList.contains('open')) {
+        closeModal();
+      } else if (document.getElementById('settingsPanel').classList.contains('open')) {
+        closeSettings();
+      } else if (document.getElementById('confirmOverlay').classList.contains('open')) {
+        confirmNo();
+      }
+    }
+  });
+
+  // Sync calendar year/month when selected date is set via form
+  if (selectedDate) {
+    const parts = selectedDate.split('-');
+    calendarYear = parseInt(parts[0]);
+    calendarMonth = parseInt(parts[1]) - 1;
+  }
+}
+
+// ===== SHARED FILE PROCESSING =====
+async function processSharedFile() {
+  // Clean URL param
+  window.history.replaceState({}, '', location.pathname);
+
+  try {
+    const cache = await caches.open('shared-files');
+    const response = await cache.match('/pending-shared-file');
+    if (!response) {
+      showToast('未找到共享文件', 'error');
+      return;
+    }
+    const blob = await response.blob();
+    await cache.delete('/pending-shared-file');
+
+    const filename = decodeURIComponent(
+      response.headers.get('X-Shared-Filename') || 'unknown.pdf'
+    );
+    await handleSharedBlob(blob, filename);
+  } catch (err) {
+    console.error('Shared file processing error:', err);
+    showToast('共享文件处理失败', 'error');
+  }
+}
+
+async function handleSharedBlob(blob, filename) {
+  document.getElementById('loadingOverlay').classList.add('open');
+  document.getElementById('loadingText').textContent = '正在解析共享文件...';
+
+  try {
+    const isPDF = filename.toLowerCase().endsWith('.pdf') || blob.type === 'application/pdf';
+    const isDocx = filename.toLowerCase().endsWith('.docx') ||
+      blob.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+
+    let text = '';
+
+    if (isPDF) {
+      await ensurePDFJS();
+      document.getElementById('loadingText').textContent = '正在提取PDF文本...';
+      text = await extractPDFText(blob);
+    } else if (isDocx) {
+      await ensureMammoth();
+      document.getElementById('loadingText').textContent = '正在提取Word文本...';
+      text = await extractDocxText(blob);
+    } else {
+      document.getElementById('loadingOverlay').classList.remove('open');
+      showToast('不支持的文件格式', 'error');
+      return;
+    }
+
+    document.getElementById('loadingOverlay').classList.remove('open');
+
+    if (!text || text.length < 10) {
+      showToast('未能提取到文字内容。此文件可能为扫描件（图片格式），无法识别。', 'error');
+      return;
+    }
+
+    const docType = classifyDocument(text);
+    let fields = {};
+    if (docType === 'summons') {
+      fields = extractSummonsFields(text);
+    } else {
+      fields = extractContractFields(text);
+    }
+
+    showRecognitionReview(docType || 'summons', fields, text);
+  } catch (err) {
+    document.getElementById('loadingOverlay').classList.remove('open');
+    console.error('Shared file error:', err);
+    showToast('文件解析失败：' + (err.message || '格式不支持'), 'error');
+  }
+}
+
+init();
+</script>
+
+</body>
+</html>
